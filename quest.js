@@ -1,12 +1,15 @@
 /* ============================================================
    MaplePins — Canada Parks Quest (Stardew-flavoured game skin)
-   Three layers on one illustrated map:
-   1) MAIN QUEST — the 48 places of the Parks Canada system
-      (37 national parks + 10 national park reserves + Rouge NUP).
-      Only these count toward the big counter, EXP and levels.
-   2) SIDE QUESTS — curated famous provincial parks, one set per
+   The whole product: one illustrated map, four layers.
+   1) MAIN QUEST — the official Parks Canada 48: 37 national
+      parks + 11 national park reserves. Only these count toward
+      the big counter, EXP and levels.
+   2) BONUS — Rouge National Urban Park, Canada's only National
+      Urban Park: on the map and clearable, but NOT one of the
+      official 48, so it never counts toward the counter or levels.
+   3) SIDE QUESTS — curated famous provincial parks, one set per
       province (Ontario set ships now). Own markers, own counters.
-   3) MY SPOTS — free personal campsite pins (tent markers).
+   4) MY SPOTS — free personal campsite pins (tent markers).
       Never counted; stored separately from quest visits.
    Photos are downscaled to ~800px and kept as data URLs in
    localStorage for this demo. In production they belong in
@@ -30,12 +33,16 @@ PROVINCES.forEach(function (p) { PROVINCE_BY_CODE[p.code] = p; });
 var KIND_LABEL = { park:'National Park', reserve:'National Park Reserve',
                    urban:'National Urban Park', provincial:'Provincial Park' };
 
-/* MAIN QUEST — list & coordinates: "List of national parks of Canada"
-   (Wikipedia table, crawled 2026-08-30) cross-checked with Parks Canada.
-   Pituamkek NPR (PEI, est. Jul 2024, an 11th reserve) is intentionally
-   left out so the quest stays the classic 48; add it as park #49 later. */
+/* MAIN QUEST — list & coordinates name-checked against Parks Canada
+   (pc.gc.ca "Find a Parks Canada location") and Wikipedia's "List of
+   national parks of Canada" on 2026-11-06: 37 national parks + 11
+   national park reserves = 48. Kluane counts as a reserve (it is a
+   National Park and Reserve); Akami-Uapishkᵁ-KakKasuak-Mealy
+   Mountains NPR (south Labrador, est. 2015) and Torngat Mountains NP
+   (north Labrador, est. 2008) are two DIFFERENT parks — both stay.
+   Pituamkek NPR (PE, est. Jul 2024) is included at 46.611, -63.785. */
 var PARKS_MAIN = [
-  { id:'akami-uapishku', name:'Akami-Uapishkᵘ-KakKasuak-Mealy Mountains', kind:'reserve', tier:'main', province:'NL', lat:53.400, lng:-59.367, blurb:'Rounded Mealy Mountains and wild Labrador Sea beaches.' },
+  { id:'akami-uapishku', name:'Akami-Uapishkᵁ-KakKasuak-Mealy Mountains', kind:'reserve', tier:'main', province:'NL', lat:53.400, lng:-59.367, blurb:'Rounded Mealy Mountains and wild Labrador Sea beaches.' },
   { id:'aulavik', name:'Aulavik', kind:'park', tier:'main', province:'NT', lat:73.700, lng:-119.917, blurb:'Treeless polar desert on Banks Island, home to muskoxen and Peary caribou.' },
   { id:'auyuittuq', name:'Auyuittuq', kind:'park', tier:'main', province:'NU', lat:67.883, lng:-65.017, blurb:'Arctic fjords and towering peaks on Baffin Island.' },
   { id:'banff', name:'Banff', kind:'park', tier:'main', province:'AB', lat:51.500, lng:-116.000, blurb:"Canada's first national park — turquoise lakes and the Valley of the Ten Peaks." },
@@ -62,6 +69,7 @@ var PARKS_MAIN = [
   { id:'naatsihchoh', name:"Nááts'įhch'oh", kind:'reserve', tier:'main', province:'NT', lat:62.367, lng:-127.967, blurb:'Moose Ponds and the headwaters of the South Nahanni River.' },
   { id:'nahanni', name:'Nahanni', kind:'reserve', tier:'main', province:'NT', lat:61.550, lng:-125.583, blurb:'Virginia Falls and the legendary South Nahanni River.' },
   { id:'pacific-rim', name:'Pacific Rim', kind:'reserve', tier:'main', province:'BC', lat:48.633, lng:-124.767, blurb:'Long Beach surf and the West Coast Trail rainforest.' },
+  { id:'pituamkek', name:'Pituamkek', kind:'reserve', tier:'main', province:'PE', lat:46.611, lng:-63.785, blurb:"A 50 km chain of barrier islands off PEI — a Mi'kmaq homeland of dunes and piping plovers." },
   { id:'point-pelee', name:'Point Pelee', kind:'park', tier:'main', province:'ON', lat:41.967, lng:-82.517, blurb:"Canada's southernmost mainland — a spring birding magnet." },
   { id:'prince-albert', name:'Prince Albert', kind:'park', tier:'main', province:'SK', lat:53.967, lng:-106.367, blurb:"Boreal forest, Waskesiu Lake and Grey Owl's cabin." },
   { id:'prince-edward-island', name:'Prince Edward Island', kind:'park', tier:'main', province:'PE', lat:46.417, lng:-63.083, blurb:'Red sandstone cliffs and the Green Gables shore.' },
@@ -69,7 +77,6 @@ var PARKS_MAIN = [
   { id:'qausuittuq', name:'Qausuittuq', kind:'park', tier:'main', province:'NU', lat:76.000, lng:-100.000, blurb:'High Arctic refuge for Peary caribou on Bathurst Island.' },
   { id:'quttinirpaaq', name:'Quttinirpaaq', kind:'park', tier:'main', province:'NU', lat:82.217, lng:-72.217, blurb:"Canada's northernmost park — Lake Hazen and polar desert." },
   { id:'riding-mountain', name:'Riding Mountain', kind:'park', tier:'main', province:'MB', lat:50.867, lng:-100.033, blurb:'Boreal forest and bison above the Manitoba prairie.' },
-  { id:'rouge', name:'Rouge', kind:'urban', tier:'main', province:'ON', lat:43.933, lng:-79.233, blurb:"North America's largest urban park, inside Toronto." },
   { id:'sable-island', name:'Sable Island', kind:'reserve', tier:'main', province:'NS', lat:43.950, lng:-59.917, blurb:'A crescent of sand famous for its wild horses.' },
   { id:'sirmilik', name:'Sirmilik', kind:'park', tier:'main', province:'NU', lat:72.983, lng:-81.133, blurb:'Glaciers, hoodoos and narwhal waters off Bylot Island.' },
   { id:'terra-nova', name:'Terra Nova', kind:'park', tier:'main', province:'NL', lat:48.533, lng:-53.933, blurb:"Rocky coves and boreal forest on Newfoundland's east coast." },
@@ -83,6 +90,14 @@ var PARKS_MAIN = [
   { id:'waterton-lakes', name:'Waterton Lakes', kind:'park', tier:'main', province:'AB', lat:49.050, lng:-113.917, blurb:'Where the prairie meets the Rockies — an International Peace Park.' },
   { id:'wood-buffalo', name:'Wood Buffalo', kind:'park', tier:'main', province:'AB', lat:59.383, lng:-112.983, blurb:"Canada's largest park — wood bison and whooping cranes. (Spans AB / NT.)" },
   { id:'yoho', name:'Yoho', kind:'park', tier:'main', province:'BC', lat:51.400, lng:-116.483, blurb:'Takakkaw Falls, Emerald Lake and Burgess Shale fossils.' }
+];
+
+/* BONUS QUEST — Rouge National Urban Park: Canada's only National
+   Urban Park, so it is NOT one of the official 48. It stays on the
+   map and can be cleared like any quest, but it never counts toward
+   the 48 counter, EXP, levels or province fills. */
+var PARKS_BONUS = [
+  { id:'rouge', name:'Rouge', kind:'urban', tier:'bonus', province:'ON', lat:43.933, lng:-79.233, blurb:"North America's largest urban park, inside Toronto." }
 ];
 
 /* SIDE QUESTS — curated provincial parks, one set per province.
@@ -103,7 +118,7 @@ var SIDE_SETS = [
   ] }
 ];
 
-var ALL_PARKS = PARKS_MAIN.slice();
+var ALL_PARKS = PARKS_MAIN.concat(PARKS_BONUS);
 SIDE_SETS.forEach(function (s) { s.parks.forEach(function (p) { ALL_PARKS.push(p); }); });
 var PARK_BY_ID = {};
 ALL_PARKS.forEach(function (p) { PARK_BY_ID[p.id] = p; });
@@ -122,10 +137,10 @@ function rankFor(n) {
   return r;
 }
 var SAMPLE_VISITS = {
-  'bruce-peninsula':  { date:'2026-07-19', photo:null },
-  'point-pelee':      { date:'2026-05-24', photo:null },
-  'rouge':            { date:'2026-09-06', photo:null },
-  'thousand-islands': { date:'2026-08-15', photo:null }
+  'bruce-peninsula':     { date:'2026-07-19', photo:null },
+  'point-pelee':         { date:'2026-05-24', photo:null },
+  'georgian-bay-islands':{ date:'2026-09-06', photo:null },
+  'thousand-islands':    { date:'2026-08-15', photo:null }
 };
 
 /* ---------------- State ----------------
@@ -156,6 +171,9 @@ function loadState() {
 }
 function mainCleared() {
   return PARKS_MAIN.filter(function (p) { return !!state.visits[p.id]; }).length;
+}
+function bonusCleared() {
+  return PARKS_BONUS.filter(function (p) { return !!state.visits[p.id]; }).length;
 }
 function setCleared(set) {
   return set.parks.filter(function (p) { return !!state.visits[p.id]; }).length;
@@ -288,7 +306,7 @@ async function loadGeo() {
   FULL = { x: -PAD, y: -PAD, w: w + PAD * 2, h: h + PAD * 2 };
 }
 /* Province fill warms up as its MAIN quests clear — a living map.
-   (Side quests and camps never recolour a province.) */
+   (Bonus, side quests and camps never recolour a province.) */
 var PROV_FILL = ['#f3ede1', '#eef0da', '#e4eece', '#d7e8bd', '#c6e0a6'];
 function provinceFill(code) {
   var parks = PARKS_MAIN.filter(function (p) { return p.province === code; });
@@ -387,14 +405,18 @@ function renderMarkersInto(parts, interactive, viewW) {
     var xy = project(park.lat, park.lng);
     var visit = state.visits[park.id];
     var side = park.tier === 'side';
-    var s = sMain * (side ? 0.76 : 1) * (visit && visit.photo ? 1.3 : 1);
+    var bonus = park.tier === 'bonus';
+    var s = sMain * (side ? 0.76 : (bonus ? 0.9 : 1)) * (visit && visit.photo ? 1.3 : 1);
     var g;
     if (visit && visit.photo) {
-      g = photoMarker(xy[0], xy[1], s, visit.photo, side ? 'mk-photo-side' : 'mk-photo');
+      g = photoMarker(xy[0], xy[1], s, visit.photo,
+        side ? 'mk-photo-side' : (bonus ? 'mk-photo-bonus' : 'mk-photo'));
     } else if (visit) {
-      g = squareMarker(xy[0], xy[1], s, side ? 'mk-done-side' : 'mk-done', '★', 1.05);
+      g = squareMarker(xy[0], xy[1], s,
+        side ? 'mk-done-side' : (bonus ? 'mk-done-bonus' : 'mk-done'), '★', 1.05);
     } else {
-      g = squareMarker(xy[0], xy[1], s, side ? 'mk-open-side' : 'mk-open', '?', 1.15);
+      g = squareMarker(xy[0], xy[1], s,
+        side ? 'mk-open-side' : (bonus ? 'mk-open-bonus' : 'mk-open'), '?', 1.15);
     }
     if (interactive) {
       (function (pk) { bindTap(g, function () { openPark(pk); }); })(park);
@@ -625,12 +647,17 @@ function renderHUD() {
     chips += '<span class="side-chip">🧭 Side · ' + esc(set.label) + ' ' +
       setCleared(set) + '/' + set.parks.length + '</span>';
   });
+  if (PARKS_BONUS.length) {
+    chips += '<span class="side-chip bonus">⭐ Bonus ' + bonusCleared() +
+      '/' + PARKS_BONUS.length + '</span>';
+  }
   chips += '<span class="side-chip camp">⛺ My Spots ' + state.camps.length + '</span>';
   $('hudChips').innerHTML = chips;
 }
 
 /* ---------------- Clear FX ---------------- */
-function playClearFx(leveledTo) {
+function playClearFx(leveledTo, floatText) {
+  $('expFloat').textContent = floatText || '+100 EXP';
   var fx = $('stampFx');
   fx.hidden = false;
   setTimeout(function () { fx.hidden = true; }, 1650);
@@ -651,10 +678,12 @@ function openPark(park) {
   pendingPhoto = undefined;
   var visit = state.visits[park.id];
   $('pkMedal').textContent = visit ? '★' : '?';
-  $('pkMedal').className = 'park-medal' + (visit ? ' done' : '') + (park.tier === 'side' ? ' side' : '');
+  $('pkMedal').className = 'park-medal' + (visit ? ' done' : '') +
+    (park.tier === 'side' ? ' side' : '') + (park.tier === 'bonus' ? ' bonus' : '');
   $('pkName').textContent = park.name;
   $('pkProv').textContent = PROVINCE_BY_CODE[park.province].name;
-  $('pkKind').textContent = KIND_LABEL[park.kind] + (park.tier === 'side' ? ' · Side Quest' : '');
+  $('pkKind').textContent = KIND_LABEL[park.kind] +
+    (park.tier === 'side' ? ' · Side Quest' : (park.tier === 'bonus' ? ' · Bonus Quest' : ''));
   $('pkBlurb').textContent = park.blurb;
   $('visitForm').hidden = true;
   $('vPreview').hidden = true;
@@ -704,7 +733,13 @@ $('visitForm').addEventListener('submit', function (e) {
   var after = levelFor(mainCleared());
   closeSheets();
   renderAll();
-  if (stored) playClearFx(currentPark.tier === 'main' && after > before ? after : 0);
+  if (stored) {
+    /* EXP (and level-ups) belong to the main quest only; side and
+       bonus clears get the stamp with their own float label. */
+    var floatText = currentPark.tier === 'main' ? '+100 EXP'
+      : (currentPark.tier === 'bonus' ? '★ BONUS' : '★ SIDE');
+    playClearFx(currentPark.tier === 'main' && after > before ? after : 0, floatText);
+  }
 });
 $('pkPhotoInput').addEventListener('change', function () {
   var f = this.files && this.files[0];
@@ -836,6 +871,11 @@ function renderJournal() {
       parks.map(questRow).join('') + '</div>';
   });
   $('mainListWrap').innerHTML = html;
+  $('bonusListWrap').innerHTML = '<div class="quest-prov"><h3>⭐ BONUS' +
+    '<span class="count">' + bonusCleared() + ' / ' + PARKS_BONUS.length + '</span></h3>' +
+    '<p class="hint">Rouge is a National Urban Park — not one of the official 48, ' +
+    'so it never counts toward your counter or level. Clear it for bragging rights.</p>' +
+    PARKS_BONUS.map(questRow).join('') + '</div>';
   var sh = '';
   SIDE_SETS.forEach(function (set) {
     sh += '<div class="quest-prov"><h3>🧭 ' + esc(set.label) + ' side quests' +
@@ -894,8 +934,8 @@ function renderPoster() {
   var provs = {};
   PARKS_MAIN.forEach(function (p) { if (state.visits[p.id]) provs[p.province] = true; });
   $('posterSub').textContent = n
-    ? n + ' of 48 national parks stamped — the map is filling in!'
-    : '48 parks await. Your first stamp is out there.';
+    ? n + ' of 48 national parks & reserves stamped — the map is filling in!'
+    : '48 parks & reserves await. Your first stamp is out there.';
   $('posterStats').innerHTML =
     '<div><strong>' + n + ' / 48</strong><span>Main quests</span></div>' +
     '<div><strong>Lv.' + levelFor(n) + '</strong><span>Explorer level</span></div>' +
@@ -903,7 +943,8 @@ function renderPoster() {
   var small = SIDE_SETS.map(function (set) {
     return '🧭 Side · ' + set.label + ' ' + setCleared(set) + '/' + set.parks.length;
   }).join('   ·   ');
-  small += (small ? '   ·   ' : '') + '⛺ My Spots ' + state.camps.length;
+  small += (small ? '   ·   ' : '') + '⭐ Bonus ' + bonusCleared() + '/' + PARKS_BONUS.length;
+  small += '   ·   ⛺ My Spots ' + state.camps.length;
   $('posterSmall').textContent = small;
   var names = PARKS_MAIN.filter(function (p) { return !!state.visits[p.id]; })
     .map(function (p) { return p.name; });
@@ -972,6 +1013,7 @@ function savePosterPng() {
     var small = SIDE_SETS.map(function (set) {
       return 'Side · ' + set.label + ' ' + setCleared(set) + '/' + set.parks.length;
     }).join('    ');
+    small += '     ⭐ Bonus ' + bonusCleared() + '/' + PARKS_BONUS.length;
     ctx.fillStyle = '#4a3f35';
     ctx.font = '800 34px ' + roundFont;
     ctx.fillText('Explorer Lv.' + levelFor(n) + '     ' + small +
