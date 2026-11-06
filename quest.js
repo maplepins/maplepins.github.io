@@ -236,8 +236,14 @@ var K_LNG = 0.55, PAD = 0.6;
    neighbour — elsewhere the centroid is used. */
 var LABEL_ANCHOR = {
   YT: [64.3, -134.8], NT: [66.0, -120.5], NU: [67.0, -96.0],
-  NB: [46.7, -66.8], PE: [47.35, -63.0], NL: [55.0, -62.5]
+  NB: [46.55, -67.9], PE: [47.95, -63.2], NL: [55.0, -62.5]
 };
+/* NB/PE separation: at country zoom (label fs = view.w*0.034 ≈
+   1.69 units, two bold caps ≈ 2.37 wide + halo → centres need
+   ≳2.64) the old anchors sat 2.19 apart and the glyphs touched.
+   NB is nudged W/SW inside the province, PE lifted over the Gulf
+   above the island's north shore: centres now 2.94 apart, glyph
+   boxes clear of PE (x axis) without crowding NS (y axis). */
 var GEO = null, GEO_BY_CODE = {}, FULL = null;
 var mapSvg = $('mapSvg'), posterSvg = $('posterSvg');
 var view = { cx:0, cy:0, w:10 };
@@ -594,9 +600,18 @@ function renderPhotoFills(parts) {
 }
 
 /* ---------------- Markers ---------------- */
+function countryShrink(zoom) {
+  /* One step smaller at the fitted country view (zoom ≈ 1), so
+     dense regions (the Maritimes, southern Ontario) don't pile
+     their "?" markers on top of each other. Ramps back to full
+     size by zoom 1.7, so focused/zoomed markers are unchanged. */
+  var t = (zoom - 1) / 0.7;
+  t = Math.max(0, Math.min(1, t));
+  return 0.74 + 0.26 * t;
+}
 function markerSize() { /* half-size of a main marker, in svg units */
   var zoom = FULL.w / view.w;
-  var s = 0.46 * Math.pow(zoom, 0.42);
+  var s = 0.46 * Math.pow(zoom, 0.42) * countryShrink(zoom);
   if (focusCode) s *= 1.2;
   return s;
 }
@@ -640,7 +655,7 @@ function renderMarkersInto(parts, interactive, viewW) {
   while (parts.markers.firstChild) parts.markers.removeChild(parts.markers.firstChild);
   while (parts.camps.firstChild) parts.camps.removeChild(parts.camps.firstChild);
   var zoom = FULL.w / (viewW || FULL.w);
-  var sMain = 0.46 * Math.pow(zoom, 0.42) * (interactive && focusCode ? 1.2 : 1);
+  var sMain = 0.46 * Math.pow(zoom, 0.42) * (interactive ? countryShrink(zoom) : 1) * (interactive && focusCode ? 1.2 : 1);
   /* Side-quest markers are the densest cluster on the map (ten in
      southern Ontario alone): on the interactive map they appear
      once a province is focused or the user zooms in. The poster
