@@ -11,6 +11,13 @@
       province (Ontario set ships now). Own markers, own counters.
    4) MY SPOTS — free personal campsite pins (tent markers).
       Never counted; stored separately from quest visits.
+   The map's land is divided into one stained-glass cell per
+   main/bonus park: the Voronoi piece of its province that is
+   closer to that park than to any sibling park, clipped to the
+   province outline. Clearing a park fills ONLY its own cell
+   with its photo — fill every cell and the whole map becomes
+   your photos, in the shape of Canada. Side quests and
+   campsites own no cells; they stay markers.
    Photos are downscaled to ~800px and kept as data URLs in
    localStorage for this demo. In production they belong in
    Supabase Storage, with only the file URL kept in the database.
@@ -221,8 +228,16 @@ function fileToDataURL(file, cb) {
 
 /* ---------------- Illustrated map (same recipe as app.js) ---------------- */
 var SVGNS = 'http://www.w3.org/2000/svg';
-var K_LNG = 0.55, PAD = 1.4;
-var LABEL_CODE_ONLY = { NL:true, NB:true, NS:true, PE:true };
+var K_LNG = 0.55, PAD = 0.6;
+/* Province labels: abbreviations only at country zoom (the full
+   names collided with each other and clipped at the frame edge);
+   the focused province swaps its label to the full name. Anchors
+   are hand-tuned [lat, lng] where the polygon centroid crowds a
+   neighbour — elsewhere the centroid is used. */
+var LABEL_ANCHOR = {
+  YT: [64.3, -134.8], NT: [66.0, -120.5], NU: [67.0, -96.0],
+  NB: [46.7, -66.8], PE: [47.35, -63.0], NL: [55.0, -62.5]
+};
 var GEO = null, GEO_BY_CODE = {}, FULL = null;
 var mapSvg = $('mapSvg'), posterSvg = $('posterSvg');
 var view = { cx:0, cy:0, w:10 };
@@ -317,7 +332,23 @@ function provinceFill(code) {
   return PROV_FILL[idx];
 }
 function buildSvgView(svg, isMain) {
-  var parts = { paths:{}, labels:null, markers:null, camps:null, temp:null, labelEls:{} };
+  var viewKey = isMain ? 'm' : 'p';
+  var parts = { paths:{}, labels:null, markers:null, camps:null, temp:null,
+    labelEls:{}, fillGroups:{}, outlines:{}, viewKey: viewKey };
+  /* Clips: one per province (its outline) and one per park cell.
+     Ids are prefixed per view so map and poster never collide. */
+  var defs = svgEl('defs');
+  GEO.features.forEach(function (f) {
+    var cp = svgEl('clipPath', { id: 'provclip-' + viewKey + '-' + f.code });
+    cp.appendChild(svgEl('path', { d: f.d }));
+    defs.appendChild(cp);
+  });
+  Object.keys(CELLS).forEach(function (id) {
+    var cp = svgEl('clipPath', { id: 'cellclip-' + viewKey + '-' + id });
+    cp.appendChild(svgEl('path', { d: cellPathD(CELLS[id]) }));
+    defs.appendChild(cp);
+  });
+  svg.appendChild(defs);
   var gProv = svgEl('g');
   GEO.features.forEach(function (f) {
     var p = svgEl('path', { d: f.d, fill: provinceFill(f.code), stroke: '#ffffff',
@@ -327,13 +358,38 @@ function buildSvgView(svg, isMain) {
     gProv.appendChild(p);
   });
   svg.appendChild(gProv);
+  /* Photo-cell layer: one province-clipped group per province,
+     populated by renderPhotoFills(). Never intercepts taps, so
+     province focusing keeps working through it. */
+  var gFills = svgEl('g');
+  GEO.features.forEach(function (f) {
+    var g = svgEl('g', { 'clip-path': 'url(#provclip-' + viewKey + '-' + f.code + ')' });
+    g.style.pointerEvents = 'none';
+    parts.fillGroups[f.code] = g;
+    gFills.appendChild(g);
+  });
+  svg.appendChild(gFills);
+  /* Crisp province outlines above the photo fills, so Canada's
+     shape stays readable even when a province is all photos. */
+  var gOut = svgEl('g');
+  GEO.features.forEach(function (f) {
+    var o = svgEl('path', { d: f.d, fill: 'none', stroke: '#ffffff',
+      'stroke-width': 0.17, 'stroke-linejoin': 'round' });
+    o.style.pointerEvents = 'none';
+    parts.outlines[f.code] = o;
+    gOut.appendChild(o);
+  });
+  svg.appendChild(gOut);
   parts.labels = svgEl('g');
   GEO.features.forEach(function (f) {
-    var t = svgEl('text', { x: f.label.x, y: f.label.y, 'text-anchor': 'middle',
+    var anchor = LABEL_ANCHOR[f.code]
+      ? project(LABEL_ANCHOR[f.code][0], LABEL_ANCHOR[f.code][1]) : null;
+    var t = svgEl('text', { x: anchor ? anchor[0] : f.label.x,
+      y: anchor ? anchor[1] : f.label.y, 'text-anchor': 'middle',
       fill: '#96754d', 'paint-order': 'stroke', stroke: '#fdf6ec',
       'stroke-linejoin': 'round', 'font-weight': 700, opacity: 0.9 });
     t.style.pointerEvents = 'none';
-    t.textContent = LABEL_CODE_ONLY[f.code] ? f.code : PROVINCE_BY_CODE[f.code].name;
+    t.textContent = f.code;
     parts.labels.appendChild(t);
     parts.labelEls[f.code] = t;
   });
@@ -353,11 +409,195 @@ function refreshProvinceFills() {
   });
 }
 
+/* ---------------- Photo cells: one Voronoi piece per park ----------------
+   Every main/bonus park owns the piece of its province closer to
+   it than to any sibling park (half-plane clipping, no library),
+   rendered clipped to the province outline. A cleared park's
+   photo fills its cell only; an uncleared (or photo-less) cell
+   keeps the province's progress colour with a subtle stained-
+   glass shade, so it still reads as an empty slot. */
+/*__PURE_START__*/
+function clipHalfPlane(poly, mx, my, dx, dy) {
+  /* Sutherland–Hodgman against one half-plane: keeps the points p
+     with (p - m) · d <= 0. */
+  var out = [];
+  for (var i = 0; i < poly.length; i++) {
+    var a = poly[i], b = poly[(i + 1) % poly.length];
+    var da = (a[0] - mx) * dx + (a[1] - my) * dy;
+    var db = (b[0] - mx) * dx + (b[1] - my) * dy;
+    if (da <= 1e-9) out.push(a);
+    if ((da < 0 && db > 0) || (da > 0 && db < 0)) {
+      var t = da / (da - db);
+      out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+    }
+  }
+  return out;
+}
+function voronoiCell(seed, seeds, rect) {
+  var poly = rect;
+  for (var i = 0; i < seeds.length; i++) {
+    var o = seeds[i];
+    if (o === seed) continue;
+    poly = clipHalfPlane(poly,
+      (seed.x + o.x) / 2, (seed.y + o.y) / 2, o.x - seed.x, o.y - seed.y);
+    if (!poly.length) break;
+  }
+  return poly;
+}
+function computeCells(provinceRects, seeds) {
+  var byProv = {};
+  seeds.forEach(function (s) {
+    (byProv[s.province] = byProv[s.province] || []).push(s);
+  });
+  var cells = {};
+  Object.keys(byProv).forEach(function (code) {
+    var r = provinceRects[code];
+    if (!r) return;
+    var m = 0.5;
+    var rect = [[r.x0 - m, r.y0 - m], [r.x1 + m, r.y0 - m],
+                [r.x1 + m, r.y1 + m], [r.x0 - m, r.y1 + m]];
+    byProv[code].forEach(function (s) {
+      var pts = voronoiCell(s, byProv[code], rect);
+      if (pts.length < 3) return;
+      var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      pts.forEach(function (p) {
+        if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0];
+        if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1];
+      });
+      cells[s.id] = { pts: pts, x0: x0, y0: y0, x1: x1, y1: y1 };
+    });
+  });
+  return cells;
+}
+/* Which photo (if any) fills a park's cell: the visitor's own
+   photo wins; Bruce Peninsula's sample visit borrows an obvious
+   illustration placeholder so the fill effect is visible on first
+   run — it is never passed off as a real photograph. */
+function pickCellPhoto(visit, parkId) {
+  if (!visit) return null;
+  if (visit.photo) return 'user';
+  if (parkId === 'bruce-peninsula') return 'placeholder';
+  return null;
+}
+/*__PURE_END__*/
+var CELLS = {};
+var PLACEHOLDER_ART = null;
+function buildCells() {
+  var rects = {}, seeds = [];
+  GEO.features.forEach(function (f) { rects[f.code] = f.bounds; });
+  ALL_PARKS.forEach(function (park) {
+    if (park.tier === 'side') return;
+    var xy = project(park.lat, park.lng);
+    seeds.push({ id: park.id, province: park.province, x: xy[0], y: xy[1] });
+  });
+  CELLS = computeCells(rects, seeds);
+}
+function cellPathD(cell) {
+  return cell.pts.map(function (p, i) {
+    return (i === 0 ? 'M' : 'L') + p[0].toFixed(2) + ' ' + p[1].toFixed(2);
+  }).join('') + 'Z';
+}
+function cellPhotoURL(park) {
+  var kind = pickCellPhoto(state.visits[park.id], park.id);
+  if (kind === 'user') return state.visits[park.id].photo;
+  if (kind === 'placeholder') return PLACEHOLDER_ART;
+  return null;
+}
+/* The Bruce placeholder: a small flat illustration (escarpment
+   cliffs + turquoise Grotto water) drawn on a canvas, so it is a
+   raster data URL exactly like a real photo — the poster export
+   treats it identically, and nobody mistakes it for a photo. */
+function makePlaceholderArt() {
+  try {
+    var c = document.createElement('canvas');
+    c.width = 640; c.height = 480;
+    var x = c.getContext('2d');
+    var sky = x.createLinearGradient(0, 0, 0, 300);
+    sky.addColorStop(0, '#79bfe6'); sky.addColorStop(1, '#e3f4fd');
+    x.fillStyle = sky; x.fillRect(0, 0, 640, 310);
+    x.fillStyle = '#ffd94d';
+    x.beginPath(); x.arc(516, 84, 44, 0, 6.3); x.fill();
+    x.fillStyle = '#fffdf4';
+    [[120, 70, 46], [168, 70, 34], [430, 132, 30], [472, 132, 22]].forEach(function (cl) {
+      x.beginPath(); x.arc(cl[0], cl[1], cl[2], 0, 6.3); x.fill();
+    });
+    x.fillStyle = '#8aa5b8';
+    x.beginPath(); x.moveTo(0, 300); x.lineTo(0, 205); x.lineTo(120, 168);
+    x.lineTo(265, 215); x.lineTo(395, 160); x.lineTo(520, 208); x.lineTo(640, 178);
+    x.lineTo(640, 300); x.closePath(); x.fill();
+    x.fillStyle = '#6d8ea6';
+    x.beginPath(); x.moveTo(0, 300); x.lineTo(0, 248); x.lineTo(150, 214);
+    x.lineTo(320, 256); x.lineTo(470, 210); x.lineTo(640, 244); x.lineTo(640, 300);
+    x.closePath(); x.fill();
+    var lake = x.createLinearGradient(0, 300, 0, 480);
+    lake.addColorStop(0, '#3ec6b8'); lake.addColorStop(1, '#1d7a78');
+    x.fillStyle = lake; x.fillRect(0, 300, 640, 180);
+    x.fillStyle = 'rgba(255,255,255,0.5)';
+    [318, 356, 402, 442].forEach(function (yy, i) {
+      x.fillRect(40 + i * 36, yy, 210 - i * 30, 6);
+      x.fillRect(392 - i * 22, yy + 4, 170 - i * 22, 6);
+    });
+    x.fillStyle = '#2e5d3a';
+    function pine(px, py, s) {
+      x.fillRect(px - 4 * s, py, 8 * s, 16 * s);
+      [0, 1, 2].forEach(function (k) {
+        var w = (30 - k * 8) * s, top = py - (14 + k * 15) * s;
+        x.beginPath(); x.moveTo(px - w, top + 22 * s); x.lineTo(px, top);
+        x.lineTo(px + w, top + 22 * s); x.closePath(); x.fill();
+      });
+    }
+    pine(52, 330, 1.15); pine(112, 344, 0.8); pine(588, 334, 1.05); pine(532, 350, 0.72);
+    return c.toDataURL('image/png');
+  } catch (e) { return null; }
+}
+/* Renders the cell layer of one view (map or poster). Everything
+   here uses presentation attributes, not CSS classes, so the
+   fills survive the poster's SVG serialization byte-for-byte. */
+function renderPhotoFills(parts) {
+  if (!parts || !parts.fillGroups) return;
+  Object.keys(parts.fillGroups).forEach(function (code) {
+    var g = parts.fillGroups[code];
+    while (g.firstChild) g.removeChild(g.firstChild);
+    var parks = ALL_PARKS.filter(function (p) {
+      return p.province === code && p.tier !== 'side';
+    });
+    /* Empty cells: a whisper of alternating shade over the
+       province's progress colour, plus the puzzle-piece edge. */
+    parks.forEach(function (park, i) {
+      var cell = CELLS[park.id];
+      if (!cell) return;
+      g.appendChild(svgEl('path', { d: cellPathD(cell),
+        fill: i % 2 ? 'rgba(122,84,33,0.055)' : 'rgba(255,255,255,0.14)',
+        stroke: 'rgba(91,58,30,0.38)', 'stroke-width': 0.055,
+        'stroke-linejoin': 'round' }));
+    });
+    /* Filled cells: the photo, cover-fit over the cell's bbox and
+       clipped to the cell shape, with a bright edge re-stroked on
+       top so the piece reads against its neighbours. */
+    parks.forEach(function (park) {
+      var cell = CELLS[park.id];
+      if (!cell) return;
+      var url = cellPhotoURL(park);
+      if (!url) return;
+      var cg = svgEl('g', { 'clip-path': 'url(#cellclip-' + parts.viewKey + '-' + park.id + ')' });
+      var img = svgEl('image', { x: cell.x0, y: cell.y0,
+        width: cell.x1 - cell.x0, height: cell.y1 - cell.y0,
+        preserveAspectRatio: 'xMidYMid slice' });
+      img.setAttribute('href', url);
+      cg.appendChild(img);
+      g.appendChild(cg);
+      g.appendChild(svgEl('path', { d: cellPathD(cell), fill: 'none',
+        stroke: 'rgba(255,253,244,0.95)', 'stroke-width': 0.075,
+        'stroke-linejoin': 'round' }));
+    });
+  });
+}
+
 /* ---------------- Markers ---------------- */
 function markerSize() { /* half-size of a main marker, in svg units */
   var zoom = FULL.w / view.w;
-  var s = 0.62 * Math.pow(zoom, 0.38);
-  if (focusCode) s *= 1.25;
+  var s = 0.46 * Math.pow(zoom, 0.42);
+  if (focusCode) s *= 1.2;
   return s;
 }
 function squareMarker(x, y, s, cls, glyph, glyphScale) {
@@ -400,18 +640,23 @@ function renderMarkersInto(parts, interactive, viewW) {
   while (parts.markers.firstChild) parts.markers.removeChild(parts.markers.firstChild);
   while (parts.camps.firstChild) parts.camps.removeChild(parts.camps.firstChild);
   var zoom = FULL.w / (viewW || FULL.w);
-  var sMain = 0.62 * Math.pow(zoom, 0.38) * (interactive && focusCode ? 1.25 : 1);
+  var sMain = 0.46 * Math.pow(zoom, 0.42) * (interactive && focusCode ? 1.2 : 1);
+  /* Side-quest markers are the densest cluster on the map (ten in
+     southern Ontario alone): on the interactive map they appear
+     once a province is focused or the user zooms in. The poster
+     always shows every marker. */
+  var showSide = !interactive || !!focusCode || zoom >= 1.8;
   ALL_PARKS.forEach(function (park) {
+    var side = park.tier === 'side';
+    if (side && !showSide) return;
     var xy = project(park.lat, park.lng);
     var visit = state.visits[park.id];
-    var side = park.tier === 'side';
     var bonus = park.tier === 'bonus';
-    var s = sMain * (side ? 0.76 : (bonus ? 0.9 : 1)) * (visit && visit.photo ? 1.3 : 1);
+    /* Parks are stamps, never photo thumbnails: a cleared park's
+       photo fills its own map cell instead (renderPhotoFills). */
+    var s = sMain * (side ? 0.76 : (bonus ? 0.9 : 1));
     var g;
-    if (visit && visit.photo) {
-      g = photoMarker(xy[0], xy[1], s, visit.photo,
-        side ? 'mk-photo-side' : (bonus ? 'mk-photo-bonus' : 'mk-photo'));
-    } else if (visit) {
+    if (visit) {
       g = squareMarker(xy[0], xy[1], s,
         side ? 'mk-done-side' : (bonus ? 'mk-done-bonus' : 'mk-done'), '★', 1.05);
     } else {
@@ -448,6 +693,7 @@ function renderMap() {
   markerEls = [];
   lastMarkerW = view.w;
   renderMarkersInto(mapParts, true, view.w);
+  renderPhotoFills(mapParts);
   refreshProvinceFills();
 }
 
@@ -466,9 +712,12 @@ function applyView() {
     (view.cx - view.w / 2) + ' ' + (view.cy - h / 2) + ' ' + view.w + ' ' + h);
   $('zoomReset').hidden = !(view.w < fitWidth() * 0.985);
   Object.keys(mapParts.labelEls).forEach(function (code) {
-    var fs = view.w * (focusCode ? 0.052 : 0.042) * (LABEL_CODE_ONLY[code] ? 0.8 : 1);
-    mapParts.labelEls[code].setAttribute('font-size', fs);
-    mapParts.labelEls[code].setAttribute('stroke-width', fs * 0.16);
+    var el = mapParts.labelEls[code];
+    var focused = focusCode === code;
+    el.textContent = focused ? PROVINCE_BY_CODE[code].name : code;
+    var fs = view.w * (focused ? 0.05 : 0.034);
+    el.setAttribute('font-size', fs);
+    el.setAttribute('stroke-width', fs * 0.16);
   });
   /* Rebuilding every marker each frame would flicker photo thumbnails;
      only re-render once the zoom has drifted a few percent. */
@@ -526,6 +775,12 @@ function refreshFocusUI() {
   if (mapParts) {
     Object.keys(mapParts.paths).forEach(function (code) {
       mapParts.paths[code].style.opacity = (!focusCode || focusCode === code) ? '' : '0.45';
+    });
+    Object.keys(mapParts.fillGroups).forEach(function (code) {
+      mapParts.fillGroups[code].style.opacity = (!focusCode || focusCode === code) ? '' : '0.45';
+    });
+    Object.keys(mapParts.outlines).forEach(function (code) {
+      mapParts.outlines[code].style.opacity = (!focusCode || focusCode === code) ? '' : '0.45';
     });
   }
   $('tapHint').textContent = focusCode
@@ -955,6 +1210,7 @@ function renderPoster() {
 function renderPosterSvg() {
   if (!posterParts) return;
   renderMarkersInto(posterParts, false, FULL.w);
+  renderPhotoFills(posterParts);
   refreshProvinceFills();
 }
 function savePosterPng() {
@@ -1087,11 +1343,14 @@ window.addEventListener('resize', function () { if (FULL) applyView(); });
     $('tapHint').textContent = 'The map could not load — check your connection and refresh.';
     return;
   }
+  buildCells();
+  PLACEHOLDER_ART = makePlaceholderArt();
   mapParts = buildSvgView(mapSvg, true);
   posterParts = buildSvgView(posterSvg, false);
   Object.keys(posterParts.labelEls).forEach(function (code) {
-    posterParts.labelEls[code].setAttribute('font-size',
-      FULL.w * 0.042 * (LABEL_CODE_ONLY[code] ? 0.8 : 1));
+    var fs = FULL.w * 0.034;
+    posterParts.labelEls[code].setAttribute('font-size', fs);
+    posterParts.labelEls[code].setAttribute('stroke-width', fs * 0.16);
   });
   fitView();
   refreshFocusUI();
