@@ -15,7 +15,7 @@
 <!-- ======================= Main stage: just the map ======================= -->
 <main id="stage">
   <svg id="mapSvg" preserveAspectRatio="xMidYMid meet" role="img"
-       aria-label="Illustrated map of Canada — tap to drop a date pin"></svg>
+       aria-label="Illustrated map of Canada — tap a province to zoom in, then tap to drop a date pin"></svg>
 
   <!-- Title + tiny summary, floating over the map -->
   <header class="title-pill">
@@ -29,6 +29,9 @@
 
   <!-- Couple code -->
   <button id="coupleBtn" class="round-btn" type="button" aria-label="Couple code and sharing">💌</button>
+
+  <!-- Back to the whole country (visible while zoomed into a province) -->
+  <button id="backBtn" class="back-btn" type="button" hidden>🍁 All of Canada</button>
 
   <!-- Zoom controls -->
   <div class="map-tools" aria-hidden="false">
@@ -50,7 +53,8 @@
 
   <!-- Bottom dock: one hint + two big actions -->
   <div class="dock">
-    <p class="hint-pill" id="tapHint">Tap the map to drop a date pin 💕</p>
+    <p class="hint-pill" id="tapHint">Tap a province to explore it 🍁</p>
+    <a href="quest.html" style="pointer-events:auto;font-size:.78rem;font-weight:700;color:#8a5a10;background:rgba(255,253,249,.9);border:1px solid #f0e2cd;padding:.35rem .8rem;border-radius:999px;box-shadow:0 4px 14px rgba(166,124,66,.14);text-decoration:none">🏕️ New: Canada Parks Quest →</a>
     <div class="dock-btns">
       <button id="recordsBtn" class="btn btn-big" type="button">📖 Our story</button>
       <button id="posterBtn" class="btn btn-big btn-primary" type="button">🖼️ Poster</button>

@@ -65,6 +65,19 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 }
 .round-btn:active{transform:scale(.94)}
 
+/* Back-to-Canada pill (province focus mode) */
+.back-btn{
+  position:absolute;top:calc(4.7rem + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
+  z-index:6;border:1px solid var(--accent-deep);background:var(--accent);color:#fff;
+  font-weight:800;font-size:.95rem;padding:.7rem 1.25rem;border-radius:999px;
+  box-shadow:0 8px 20px rgba(217,79,79,.35);cursor:pointer;min-height:48px;white-space:nowrap;
+}
+.back-btn[hidden]{display:none}
+.back-btn:active{transform:translateX(-50%) scale(.96)}
+
+/* SVG map text (province + city labels) uses the round font */
+#mapSvg text{font-family:var(--round-font)}
+
 /* Zoom tools */
 .map-tools{
   position:absolute;right:.8rem;bottom:calc(7.6rem + env(safe-area-inset-bottom));
@@ -214,7 +227,9 @@ form input:focus,form select:focus{outline:2px solid #f3b8a4;border-color:#f3b8a
 .province-fill{height:100%;border-radius:99px;transition:width .4s ease}
 
 /* Checklists */
-.checklist-city{margin-top:.9rem}
+.checklist-city{margin-top:.9rem;border-radius:14px}
+.checklist-city.flash{animation:cityFlash 1.6s ease}
+@keyframes cityFlash{0%,55%{background:#fdeec9}100%{background:transparent}}
 .checklist-city h3{font-size:.95rem;margin:0 0 .4rem;display:flex;justify-content:space-between}
 .checklist-city h3 .count{color:var(--muted);font-weight:700}
 .spot-chips{display:flex;flex-wrap:wrap;gap:.4rem}

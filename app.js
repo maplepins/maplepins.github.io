@@ -53,27 +53,44 @@ var CITIES = [
   { name:'Mississauga',   province:'ON', lat:43.5890, lng:-79.6441 },
   { name:'Hamilton',      province:'ON', lat:43.2557, lng:-79.8711 },
   { name:'Kitchener',     province:'ON', lat:43.4516, lng:-80.4925 },
+  { name:'Waterloo',      province:'ON', lat:43.4643, lng:-80.5204 },
   { name:'Kingston',      province:'ON', lat:44.2312, lng:-76.4860 },
   { name:'Niagara Falls', province:'ON', lat:43.0962, lng:-79.0377 },
+  { name:'Windsor',       province:'ON', lat:42.3149, lng:-83.0364 },
   { name:'Vancouver',     province:'BC', lat:49.2827, lng:-123.1207 },
   { name:'Victoria',      province:'BC', lat:48.4284, lng:-123.3656 },
   { name:'Whistler',      province:'BC', lat:50.1163, lng:-122.9574 },
   { name:'Kelowna',       province:'BC', lat:49.8880, lng:-119.4960 },
+  { name:'Nanaimo',       province:'BC', lat:49.1659, lng:-123.9401 },
+  { name:'Kamloops',      province:'BC', lat:50.6745, lng:-120.3273 },
   { name:'Calgary',       province:'AB', lat:51.0447, lng:-114.0719 },
   { name:'Edmonton',      province:'AB', lat:53.5461, lng:-113.4938 },
   { name:'Banff',         province:'AB', lat:51.1784, lng:-115.5708 },
+  { name:'Jasper',        province:'AB', lat:52.8737, lng:-118.0814 },
   { name:'Montreal',      province:'QC', lat:45.5019, lng:-73.5674 },
   { name:'Quebec City',   province:'QC', lat:46.8139, lng:-71.2080 },
   { name:'Gatineau',      province:'QC', lat:45.4765, lng:-75.7013 },
+  { name:'Mont-Tremblant', province:'QC', lat:46.2099, lng:-74.5852 },
   { name:'Winnipeg',      province:'MB', lat:49.8951, lng:-97.1384 },
+  { name:'Brandon',       province:'MB', lat:49.8484, lng:-99.9501 },
   { name:'Regina',        province:'SK', lat:50.4452, lng:-104.6189 },
   { name:'Saskatoon',     province:'SK', lat:52.1332, lng:-106.6700 },
   { name:'Halifax',       province:'NS', lat:44.6488, lng:-63.5752 },
+  { name:'Sydney',        province:'NS', lat:46.1368, lng:-60.1942 },
+  { name:'Lunenburg',     province:'NS', lat:44.3770, lng:-64.3188 },
   { name:'Charlottetown', province:'PE', lat:46.2382, lng:-63.1311 },
+  { name:'Summerside',    province:'PE', lat:46.3932, lng:-63.7913 },
   { name:'Fredericton',   province:'NB', lat:45.9636, lng:-66.6431 },
+  { name:'Moncton',       province:'NB', lat:46.0878, lng:-64.7782 },
+  { name:'Saint John',    province:'NB', lat:45.2733, lng:-66.0633 },
   { name:"St. John's",    province:'NL', lat:47.5615, lng:-52.7126 },
+  { name:'Corner Brook',  province:'NL', lat:48.9500, lng:-57.9419 },
   { name:'Whitehorse',    province:'YT', lat:60.7212, lng:-135.0568 },
-  { name:'Yellowknife',   province:'NT', lat:62.4540, lng:-114.3718 }
+  { name:'Dawson City',   province:'YT', lat:64.0601, lng:-139.4333 },
+  { name:'Yellowknife',   province:'NT', lat:62.4540, lng:-114.3718 },
+  { name:'Inuvik',        province:'NT', lat:68.3607, lng:-133.7230 },
+  { name:'Iqaluit',       province:'NU', lat:63.7467, lng:-68.5170 },
+  { name:'Rankin Inlet',  province:'NU', lat:62.8090, lng:-92.0907 }
 ];
 
 // Famous date spots per checklist city: a pin within SPOT_RADIUS_KM checks it off.
@@ -381,10 +398,20 @@ function pinsInStoryOrder() {
 var SVGNS = 'http://www.w3.org/2000/svg';
 var K_LNG = 0.55;              // longitude squeeze so Canada keeps its shape
 var PAD = 1.4;                 // padding (svg units) around the country
-var GEO = null;                // { minLng, maxLat, features:[{code, d}] }
+var GEO = null;                // { minLng, maxLat, features:[{code, d, bounds, label}] }
+var GEO_BY_CODE = {};
 var FULL = null;               // { x, y, w, h } full padded extent
 var mapSvg = null, posterSvg = null;
-var mapParts = null, posterParts = null;   // { paths:{code:path}, journey, pins, temp }
+var mapParts = null, posterParts = null;   // { paths:{code:path}, journey, pins, temp, labels, cities }
+
+// Small Atlantic provinces get their postal code as the map label
+// (full names would spill far outside their outlines).
+var LABEL_CODE_ONLY = { NL: true, NB: true, NS: true, PE: true };
+// Province focus (zoom-in) state for the main map.
+var focusCode = null;          // province code while zoomed into one province
+var viewAnim = null;           // requestAnimationFrame id of a view animation
+var provLabelEls = {};         // code -> <text> on the main map
+var mapMarkers = [];           // city/spot markers of the focused province
 
 var HEART_D = 'M0 0.62 C-0.10 0.36 -0.64 0.08 -0.64 -0.22 ' +
               'C-0.64 -0.52 -0.40 -0.68 -0.19 -0.68 ' +
@@ -417,6 +444,20 @@ function geomToPath(geom) {
   });
   return d;
 }
+// Area-weighted centroid of a projected ring (shoelace formula).
+function ringCentroidPts(pts) {
+  var a = 0, cx = 0, cy = 0;
+  for (var i = 0; i < pts.length - 1; i++) {
+    var x1 = pts[i][0], y1 = pts[i][1], x2 = pts[i + 1][0], y2 = pts[i + 1][1];
+    var cross = x1 * y2 - x2 * y1;
+    a += cross;
+    cx += (x1 + x2) * cross;
+    cy += (y1 + y2) * cross;
+  }
+  a /= 2;
+  if (Math.abs(a) < 1e-9) return null;
+  return { area: Math.abs(a), x: cx / (6 * a), y: cy / (6 * a) };
+}
 async function loadGeo() {
   var res = await fetch('canada-provinces.json');
   if (!res.ok) throw new Error('geojson ' + res.status);
@@ -434,7 +475,33 @@ async function loadGeo() {
   });
   GEO = { minLng: minLng, maxLat: maxLat, features: [] };
   fc.features.forEach(function (f) {
-    GEO.features.push({ code: f.properties.code, d: geomToPath(f.geometry) });
+    // Projected bounds (for zoom-to-province) + a label anchor: the
+    // centroid of the province's largest polygon (falls back to the
+    // bounds centre for degenerate shapes).
+    var bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity, best = null;
+    f.geometry.coordinates.forEach(function (poly) {
+      poly.forEach(function (ring) {
+        ring.forEach(function (pt) {
+          var xy = project(pt[1], pt[0]);
+          if (xy[0] < bx0) bx0 = xy[0];
+          if (xy[0] > bx1) bx1 = xy[0];
+          if (xy[1] < by0) by0 = xy[1];
+          if (xy[1] > by1) by1 = xy[1];
+        });
+      });
+      var outer = poly[0].map(function (pt) { return project(pt[1], pt[0]); });
+      var c = ringCentroidPts(outer);
+      if (c && (!best || c.area > best.area)) best = c;
+    });
+    var feat = {
+      code: f.properties.code,
+      d: geomToPath(f.geometry),
+      bounds: { x0: bx0, y0: by0, x1: bx1, y1: by1 },
+      label: best ? { x: best.x, y: best.y }
+                  : { x: (bx0 + bx1) / 2, y: (by0 + by1) / 2 }
+    };
+    GEO.features.push(feat);
+    GEO_BY_CODE[feat.code] = feat;
   });
   // Full extent: also need projected width/height — recompute from lng/lat spans.
   var minLat = Infinity, maxLng = -Infinity;
@@ -451,26 +518,48 @@ async function loadGeo() {
   var w = (maxLng - minLng) * K_LNG, h = maxLat - minLat;
   FULL = { x: -PAD, y: -PAD, w: w + PAD * 2, h: h + PAD * 2 };
 }
-function buildSvgView(svg, withTemp) {
-  var parts = { paths: {}, journey: null, pins: null, temp: null };
+function buildSvgView(svg, isMain) {
+  var parts = { paths: {}, journey: null, pins: null, temp: null, labels: null, cities: null };
   var gProv = svgEl('g');
   GEO.features.forEach(function (f) {
     var p = svgEl('path', {
       d: f.d, fill: TIER_FILL[0], stroke: '#ffffff',
       'stroke-width': 0.13, 'stroke-linejoin': 'round'
     });
+    p.dataset.code = f.code;
     parts.paths[f.code] = p;
     gProv.appendChild(p);
   });
   svg.appendChild(gProv);
+  if (isMain) {
+    // Province name labels (soft, with a paper halo). They never take
+    // taps — taps pass through to the province underneath.
+    parts.labels = svgEl('g');
+    GEO.features.forEach(function (f) {
+      var t = svgEl('text', {
+        x: f.label.x, y: f.label.y, 'text-anchor': 'middle',
+        'class': 'prov-label', fill: '#96754d', 'paint-order': 'stroke',
+        stroke: '#fdf6ec', 'stroke-linejoin': 'round', 'font-weight': 700, opacity: 0.9
+      });
+      t.style.pointerEvents = 'none';
+      t.textContent = LABEL_CODE_ONLY[f.code] ? f.code : PROVINCE_BY_CODE[f.code].name;
+      parts.labels.appendChild(t);
+      provLabelEls[f.code] = t;
+    });
+    svg.appendChild(parts.labels);
+  }
   parts.journey = svgEl('path', {
     d: '', fill: 'none', stroke: '#eda08c', 'stroke-width': 0.15,
-    'stroke-opacity': 0.55, 'stroke-linecap': 'round'
+    'stroke-opacity': 0.55, 'stroke-linecap': 'round', 'pointer-events': 'none'
   });
   svg.appendChild(parts.journey);
+  if (isMain) {
+    parts.cities = svgEl('g');
+    svg.appendChild(parts.cities);
+  }
   parts.pins = svgEl('g');
   svg.appendChild(parts.pins);
-  if (withTemp) {
+  if (isMain) {
     parts.temp = svgEl('g');
     svg.appendChild(parts.temp);
   }
@@ -514,6 +603,7 @@ function renderPinsInto(parts, stats, interactive) {
     var xy = project(pin.lat, pin.lng);
     var tier = pin.province ? stats[pin.province].tier : 0;
     var g = makeHeart(xy[0], xy[1], 1.5, TIER_COLORS[Math.max(tier, 1)], null);
+    g.dataset.bx = xy[0]; g.dataset.by = xy[1]; g.dataset.bs = 1.5;
     if (interactive) {
       var hit = svgEl('circle', { r: 1.9, fill: 'rgba(0,0,0,0)' });
       g.appendChild(hit);
@@ -535,7 +625,9 @@ function renderTempPin() {
   var xy = project(state.pending.lat, state.pending.lng);
   var halo = svgEl('circle', { cx: xy[0], cy: xy[1], r: 1.35, fill: '#ffffff', 'fill-opacity': 0.85 });
   t.appendChild(halo);
-  t.appendChild(makeHeart(xy[0], xy[1], 1.8, '#ef6f6c', { cls: 'temp-heart' }));
+  var heart = makeHeart(xy[0], xy[1], 1.8, '#ef6f6c', { cls: 'temp-heart' });
+  heart.dataset.bx = xy[0]; heart.dataset.by = xy[1]; heart.dataset.bs = 1.8;
+  t.appendChild(heart);
 }
 function renderMapParts(stats) {
   if (!GEO || !mapParts) return;
@@ -550,6 +642,7 @@ function renderMapParts(stats) {
   renderPinsInto(mapParts, stats, true);
   if (posterParts) renderPinsInto(posterParts, stats, false);
   renderTempPin();
+  rescaleChrome();
 }
 
 /* ---------------- Map view (zoom / pan / tap) ---------------- */
@@ -566,6 +659,7 @@ function applyView() {
   mapSvg.setAttribute('viewBox',
     (view.cx - view.w / 2) + ' ' + (view.cy - h / 2) + ' ' + view.w + ' ' + h);
   document.getElementById('zoomReset').hidden = !(view.w < fitWidth() * 0.985);
+  rescaleChrome();
 }
 function clampView() {
   var mx = FULL.w * 0.3, my = FULL.h * 0.3;
@@ -580,7 +674,7 @@ function fitView() {
   applyView();
 }
 function zoomAt(p, factor) {
-  var newW = Math.min(Math.max(view.w * factor, FULL.w / 16), fitWidth() * 1.02);
+  var newW = Math.min(Math.max(view.w * factor, FULL.w / 28), fitWidth() * 1.02);
   var k = newW / view.w;
   view.cx = p.x - (p.x - view.cx) * k;
   view.cy = p.y - (p.y - view.cy) * k;
@@ -597,11 +691,194 @@ function clientToSvg(evt) {
 }
 function focusPin(pin) {
   var xy = project(pin.lat, pin.lng);
-  view.w = Math.min(Math.max(FULL.w / 3.4, FULL.w / 16), FULL.w);
-  view.cx = xy[0]; view.cy = xy[1];
-  clampView();
-  applyView();
+  focusCode = pin.province || null;
+  refreshFocusUI();
+  animateViewTo(xy[0], xy[1],
+    Math.min(Math.max(FULL.w / 3.4, FULL.w / 16), FULL.w), 550);
   showBubble(pin);
+}
+
+/* --------- Province focus: animated zoom + in-province detail --------- */
+function cancelViewAnim() {
+  if (viewAnim) { cancelAnimationFrame(viewAnim); viewAnim = null; }
+}
+function animateViewTo(cx, cy, w, dur) {
+  cancelViewAnim();
+  var from = { cx: view.cx, cy: view.cy, w: view.w };
+  var start = null;
+  function step(ts) {
+    if (!start) start = ts;
+    var t = Math.min(1, (ts - start) / (dur || 600));
+    var e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    view.cx = from.cx + (cx - from.cx) * e;
+    view.cy = from.cy + (cy - from.cy) * e;
+    view.w = from.w + (w - from.w) * e;
+    clampView();
+    applyView();
+    viewAnim = t < 1 ? requestAnimationFrame(step) : null;
+  }
+  viewAnim = requestAnimationFrame(step);
+}
+function focusProvince(code) {
+  var f = GEO_BY_CODE[code];
+  if (!f) return;
+  focusCode = code;
+  hideBubble();
+  refreshFocusUI();
+  var r = stageRect();
+  var bw = f.bounds.x1 - f.bounds.x0, bh = f.bounds.y1 - f.bounds.y0;
+  var padF = 1.3;
+  var tw = Math.max(bw * padF, bh * padF * (r.width / Math.max(r.height, 1)));
+  tw = Math.min(Math.max(tw, FULL.w / 30), fitWidth());
+  animateViewTo((f.bounds.x0 + f.bounds.x1) / 2, (f.bounds.y0 + f.bounds.y1) / 2, tw, 650);
+}
+function exitFocus() {
+  if (!GEO || !FULL) return;
+  focusCode = null;
+  refreshFocusUI();
+  animateViewTo(FULL.x + FULL.w / 2, FULL.y + FULL.h / 2, fitWidth(), 650);
+}
+function updateHint() {
+  var hint = document.getElementById('tapHint');
+  if (!hint) return;
+  hint.textContent = focusCode
+    ? '📍 ' + PROVINCE_BY_CODE[focusCode].name + ' — tap to drop a pin · tap outside to go back'
+    : 'Tap a province to explore it 🍁';
+}
+function refreshFocusUI() {
+  var bb = document.getElementById('backBtn');
+  if (bb) bb.hidden = !focusCode;
+  if (mapParts) {
+    Object.keys(mapParts.paths).forEach(function (code) {
+      mapParts.paths[code].style.opacity = (!focusCode || focusCode === code) ? '' : '0.45';
+    });
+  }
+  renderCities();
+  updateHint();
+  rescaleChrome();
+}
+
+/* Keep map chrome (strokes, hearts, labels, markers) a roughly constant
+   on-screen size no matter how far the view is zoomed. */
+function rescaleHearts(group, ss) {
+  if (!group) return;
+  for (var i = 0; i < group.children.length; i++) {
+    var g = group.children[i];
+    if (g.dataset && g.dataset.bs) {
+      g.setAttribute('transform',
+        'translate(' + g.dataset.bx + ' ' + g.dataset.by + ') scale(' +
+        (parseFloat(g.dataset.bs) * ss).toFixed(3) + ')');
+    }
+  }
+}
+function rescaleChrome() {
+  if (!mapParts || !FULL || !GEO) return;
+  var ss = view.w / fitWidth();
+  Object.keys(mapParts.paths).forEach(function (code) {
+    mapParts.paths[code].setAttribute('stroke-width', (0.13 * ss).toFixed(3));
+  });
+  mapParts.journey.setAttribute('stroke-width', (0.15 * ss).toFixed(3));
+  rescaleHearts(mapParts.pins, ss);
+  rescaleHearts(mapParts.temp, ss);
+  Object.keys(provLabelEls).forEach(function (code) {
+    var t = provLabelEls[code];
+    var show = !focusCode || focusCode === code;
+    t.style.display = show ? '' : 'none';
+    var fs = view.w * (focusCode ? 0.052 : 0.042) * (LABEL_CODE_ONLY[code] ? 0.8 : 1);
+    t.setAttribute('font-size', fs.toFixed(2));
+    t.setAttribute('stroke-width', (fs * 0.16).toFixed(2));
+  });
+  mapMarkers.forEach(function (m) {
+    var r = view.w * (m.kind === 'city' ? 0.0115 : 0.0095);
+    m.dot.setAttribute('r', r.toFixed(2));
+    m.dot.setAttribute('stroke-width', (r * 0.22).toFixed(3));
+    if (m.hit) m.hit.setAttribute('r', Math.max(r * 2.4, view.w * 0.016).toFixed(2));
+    if (m.label) {
+      var fs2 = view.w * 0.033;
+      m.label.setAttribute('font-size', fs2.toFixed(2));
+      m.label.setAttribute('stroke-width', (fs2 * 0.16).toFixed(2));
+      m.label.setAttribute('x', (m.x + r * 1.8).toFixed(2));
+      m.label.setAttribute('y', (m.y + fs2 * 0.36).toFixed(2));
+    }
+  });
+}
+
+/* City + famous-spot markers inside the focused province. */
+function renderCities() {
+  mapMarkers = [];
+  if (!mapParts || !mapParts.cities) return;
+  var g = mapParts.cities;
+  while (g.firstChild) g.removeChild(g.firstChild);
+  if (!focusCode || !GEO) return;
+  // Famous spots of this province's checklist cities (small dots).
+  Object.keys(SPOTS).forEach(function (cityName) {
+    var cityObj = null;
+    CITIES.forEach(function (c) { if (c.name === cityName) cityObj = c; });
+    if (!cityObj || cityObj.province !== focusCode) return;
+    SPOTS[cityName].forEach(function (s) {
+      var xy = project(s.lat, s.lng);
+      var dot = svgEl('circle', {
+        cx: xy[0], cy: xy[1], r: 0.3,
+        fill: spotDone(s) ? '#57a773' : '#ffffff',
+        stroke: '#c9a877', 'stroke-width': 0.06, 'class': 'spot-dot'
+      });
+      var title = svgEl('title');
+      title.textContent = s.name + ' · ' + cityName;
+      dot.appendChild(title);
+      dot.style.cursor = 'pointer';
+      dot.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+      dot.addEventListener('click', function (e) {
+        e.stopPropagation();
+        openRecordsForCity(cityName);
+      });
+      g.appendChild(dot);
+      mapMarkers.push({ kind: 'spot', x: xy[0], y: xy[1], dot: dot, label: null, hit: null });
+    });
+  });
+  // City markers: coral dot + name.
+  CITIES.forEach(function (c) {
+    if (c.province !== focusCode) return;
+    var xy = project(c.lat, c.lng);
+    var grp = svgEl('g');
+    var dot = svgEl('circle', {
+      cx: xy[0], cy: xy[1], r: 0.4, fill: '#ef6f6c',
+      stroke: '#ffffff', 'stroke-width': 0.09, 'class': 'city-dot'
+    });
+    var hit = svgEl('circle', { cx: xy[0], cy: xy[1], r: 1.1, fill: 'rgba(0,0,0,0)' });
+    var label = svgEl('text', {
+      'class': 'city-label', fill: '#7a5c3e', 'paint-order': 'stroke',
+      stroke: '#fdf6ec', 'stroke-linejoin': 'round', 'font-weight': 700
+    });
+    label.textContent = c.name;
+    label.style.pointerEvents = 'none';
+    grp.appendChild(dot);
+    grp.appendChild(hit);
+    grp.appendChild(label);
+    [dot, hit].forEach(function (el) {
+      el.style.cursor = 'pointer';
+      el.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+      el.addEventListener('click', function (e) {
+        e.stopPropagation();
+        hideBubble();
+        if (SPOTS[c.name]) openRecordsForCity(c.name);
+        else setPending(c.lat, c.lng);
+      });
+    });
+    g.appendChild(grp);
+    mapMarkers.push({ kind: 'city', x: xy[0], y: xy[1], dot: dot, label: label, hit: hit });
+  });
+  rescaleChrome();
+}
+function openRecordsForCity(city) {
+  openSheet('recordsSheet');
+  setTimeout(function () {
+    var el = document.getElementById('checklist-' + city);
+    if (!el) return;
+    el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    el.classList.remove('flash');
+    void el.offsetWidth;
+    el.classList.add('flash');
+  }, 60);
 }
 
 /* ---------------- Pin bubble ---------------- */
@@ -689,7 +966,7 @@ function renderChecklists() {
       var d = spotDone(s);
       return '<span class="spot-chip' + (d ? ' done' : '') + '">' + (d ? '✓ ' : '') + esc(s.name) + '</span>';
     }).join('');
-    return '<div class="checklist-city"><h3>' + esc(city) +
+    return '<div class="checklist-city" id="checklist-' + esc(city) + '"><h3>' + esc(city) +
       ' <span class="count">' + doneCount + '/' + spots.length + '</span></h3>' +
       '<div class="spot-chips">' + chips + '</div></div>';
   }).join('');
@@ -854,10 +1131,17 @@ function renderCouple() {
 
 /* ---------------- Wiring ---------------- */
 function wire() {
-  /* Map pan / tap */
+  /* Map pan / tap.
+     Tap behaviour depends on focus:
+     - Full map: tapping a province zooms into it.
+     - Zoomed into a province: tapping that province drops a pin;
+       tapping anywhere else (another province, the ocean) zooms back out.
+     Hearts and city/spot markers stopPropagation their own pointerdown,
+     so they never reach this handler. */
   var drag = null;
   mapSvg.addEventListener('pointerdown', function (e) {
-    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: view.cx, cy: view.cy, moved: false };
+    cancelViewAnim();
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: view.cx, cy: view.cy, moved: false, target: e.target };
     try { mapSvg.setPointerCapture(e.pointerId); } catch (err) {}
   });
   mapSvg.addEventListener('pointermove', function (e) {
@@ -875,32 +1159,42 @@ function wire() {
   });
   function endPointer(e, isTap) {
     if (!drag || e.pointerId !== drag.id) return;
-    var wasDrag = drag.moved;
+    var wasDrag = drag.moved, target = drag.target;
     drag = null;
-    if (isTap && !wasDrag && GEO) {
+    if (!isTap || wasDrag || !GEO) return;
+    var code = target && target.dataset ? target.dataset.code : null;
+    if (!focusCode) {
+      if (code) focusProvince(code);
+      return;
+    }
+    if (code === focusCode) {
       var p = clientToSvg(e);
       if (!p) return;
       var ll = unproject(p.x, p.y);
       hideBubble();
       setPending(ll.lat, ll.lng);
+    } else {
+      exitFocus();
     }
   }
   mapSvg.addEventListener('pointerup', function (e) { endPointer(e, true); });
   mapSvg.addEventListener('pointercancel', function (e) { endPointer(e, false); });
-  mapSvg.addEventListener('dblclick', function (e) {
-    if (!GEO) return;
-    e.preventDefault();
-    var p = clientToSvg(e);
-    if (p) zoomAt(p, 0.55);
-  });
 
   document.getElementById('zoomIn').addEventListener('click', function () {
     if (GEO) zoomAt({ x: view.cx, y: view.cy }, 0.62);
   });
   document.getElementById('zoomOut').addEventListener('click', function () {
-    if (GEO) zoomAt({ x: view.cx, y: view.cy }, 1.6);
+    if (!GEO) return;
+    zoomAt({ x: view.cx, y: view.cy }, 1.6);
+    if (focusCode && view.w >= fitWidth() * 0.985) {
+      focusCode = null;
+      refreshFocusUI();
+    }
   });
-  document.getElementById('zoomReset').addEventListener('click', fitView);
+  document.getElementById('zoomReset').addEventListener('click', function () {
+    if (focusCode) exitFocus(); else fitView();
+  });
+  document.getElementById('backBtn').addEventListener('click', exitFocus);
   window.addEventListener('resize', function () {
     if (!FULL) return;
     if (view.w >= fitWidth() * 0.985) fitView(); else applyView();
