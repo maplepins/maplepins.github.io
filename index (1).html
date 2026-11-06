@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>MaplePins — Couple Date Map</title>
+<meta name="description" content="Pin every date across Canada. Fill the map, province by province, and turn it into a poster.">
+<!-- PWA basics -->
+<meta name="theme-color" content="#fdf6ec">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍁</text></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ======================= Main stage: just the map ======================= -->
+<main id="stage">
+  <svg id="mapSvg" preserveAspectRatio="xMidYMid meet" role="img"
+       aria-label="Illustrated map of Canada — tap to drop a date pin"></svg>
+
+  <!-- Title + tiny summary, floating over the map -->
+  <header class="title-pill">
+    <span class="brand-mark">🍁</span>
+    <span class="brand-text">
+      <strong>MaplePins</strong>
+      <small id="summaryLine">Loading our map…</small>
+    </span>
+    <span id="modeBadge" class="badge">Demo</span>
+  </header>
+
+  <!-- Couple code -->
+  <button id="coupleBtn" class="round-btn" type="button" aria-label="Couple code and sharing">💌</button>
+
+  <!-- Zoom controls -->
+  <div class="map-tools" aria-hidden="false">
+    <button id="zoomIn" class="tool-btn" type="button" aria-label="Zoom in">＋</button>
+    <button id="zoomOut" class="tool-btn" type="button" aria-label="Zoom out">－</button>
+    <button id="zoomReset" class="tool-btn" type="button" aria-label="See all of Canada" hidden>⟲</button>
+  </div>
+
+  <!-- Pin info bubble -->
+  <div id="pinBubble" class="pin-bubble" hidden>
+    <div class="pb-main">
+      <div class="pb-name" id="pbName"></div>
+      <div class="pb-sub" id="pbSub"></div>
+      <div class="pb-note" id="pbNote"></div>
+    </div>
+    <button id="pbDelete" class="pb-del" type="button">Delete</button>
+    <button id="pbClose" class="pb-close" type="button" aria-label="Close">✕</button>
+  </div>
+
+  <!-- Bottom dock: one hint + two big actions -->
+  <div class="dock">
+    <p class="hint-pill" id="tapHint">Tap the map to drop a date pin 💕</p>
+    <div class="dock-btns">
+      <button id="recordsBtn" class="btn btn-big" type="button">📖 Our story</button>
+      <button id="posterBtn" class="btn btn-big btn-primary" type="button">🖼️ Poster</button>
+    </div>
+  </div>
+</main>
+
+<!-- ======================= Sheets ======================= -->
+<div id="backdrop" class="backdrop" hidden></div>
+
+<!-- Add a pin -->
+<section id="addSheet" class="sheet" aria-label="Add a date pin" hidden>
+  <div class="sheet-handle"></div>
+  <button class="sheet-close" type="button" data-close aria-label="Close">✕</button>
+  <h2>New date pin 💘</h2>
+  <form id="pinForm">
+    <label>Place name
+      <input id="fName" type="text" required placeholder="That little café in London">
+    </label>
+    <div class="form-2col">
+      <label>Date
+        <input id="fDate" type="date">
+      </label>
+      <label>Kind
+        <select id="fCategory">
+          <option value="cafe">☕ Café</option>
+          <option value="food">🍽️ Food</option>
+          <option value="view">🌅 View</option>
+          <option value="activity">🎡 Activity</option>
+          <option value="stay">🏨 Stay</option>
+          <option value="other">📍 Other</option>
+        </select>
+      </label>
+    </div>
+    <label>Note <span class="opt">(optional)</span>
+      <input id="fNote" type="text" placeholder="It rained, we stayed for hours">
+    </label>
+    <p class="hint" id="fCoords">Tap the map first.</p>
+    <button class="btn btn-primary btn-big btn-block" type="submit" id="addPinBtn" disabled>Pin it on our map</button>
+    <button class="btn btn-ghost btn-block" type="button" id="addCancelBtn">Cancel</button>
+  </form>
+</section>
+
+<!-- Our story: progress + checklists + pins -->
+<section id="recordsSheet" class="sheet" aria-label="Our story so far" hidden>
+  <div class="sheet-handle"></div>
+  <button class="sheet-close" type="button" data-close aria-label="Close">✕</button>
+  <h2>Our story so far</h2>
+
+  <div class="toggle-row">
+    <span>🛤️ Journey line<small>Connect our pins with a thread, in date order</small></span>
+    <label class="switch">
+      <input type="checkbox" id="journeyToggle" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <h3 class="sheet-sub">Province progress</h3>
+  <p class="hint">More pins and more cities raise a province's tier — and deepen its colour on the map.</p>
+  <div id="provinceList" class="province-list"></div>
+
+  <h3 class="sheet-sub">Famous date spots</h3>
+  <p class="hint">Drop a pin at a spot to check it off. Finish a city, one date at a time.</p>
+  <div id="checklistWrap"></div>
+
+  <div class="sheet-head-row">
+    <h3 class="sheet-sub">Our pins</h3>
+    <button id="clearSeedsBtn" class="btn btn-small btn-ghost" type="button">Clear example pins</button>
+  </div>
+  <ul id="pinList" class="pin-list"></ul>
+</section>
+
+<!-- Couple code / sharing -->
+<section id="coupleSheet" class="sheet" aria-label="Couple code and sharing" hidden>
+  <div class="sheet-handle"></div>
+  <button class="sheet-close" type="button" data-close aria-label="Close">✕</button>
+  <h2>Share this map 💌</h2>
+  <p class="label">Our couple code</p>
+  <div class="code-line">
+    <code id="myCode">······</code>
+    <button id="copyCodeBtn" class="btn" type="button">Copy</button>
+  </div>
+  <p class="hint">Send this code to your partner so you share one map.</p>
+  <button id="newCodeBtn" class="btn btn-ghost" type="button">Start a new map instead</button>
+
+  <form id="joinForm" class="join-form">
+    <label class="label" for="joinInput">Partner's code</label>
+    <div class="code-line">
+      <input id="joinInput" type="text" placeholder="ABC123" maxlength="8" autocomplete="off">
+      <button class="btn btn-primary" type="submit">Join</button>
+    </div>
+    <p class="hint">Joining switches this device to your partner's map.</p>
+  </form>
+  <p id="coupleMsg" class="msg" role="status"></p>
+  <p class="hint" id="modeLine"></p>
+</section>
+
+<!-- Poster -->
+<section id="posterSheet" class="sheet sheet-poster" aria-label="Your poster" hidden>
+  <div class="sheet-handle"></div>
+  <button class="sheet-close" type="button" data-close aria-label="Close">✕</button>
+  <h2>Your poster 🖼️</h2>
+  <div id="posterCard" class="poster-card">
+    <div class="poster-kicker">OUR CANADA STORY</div>
+    <div class="poster-title">Two people, one big map</div>
+    <p class="poster-sub" id="posterSub"></p>
+    <svg id="posterSvg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Our illustrated Canada map"></svg>
+    <div class="poster-stats" id="posterStats"></div>
+    <p class="poster-foot">🍁 Made with our own two feet — and a lot of coffee.</p>
+  </div>
+  <button id="posterPngBtn" class="btn btn-primary btn-big btn-block" type="button">Save poster as PNG</button>
+</section>
+
+<!-- Libraries: Supabase only (map is hand-drawn SVG; PNG is composed on canvas) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Your keys live in config.js (copy config.example.js). Missing file = demo mode. -->
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
