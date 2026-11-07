@@ -257,6 +257,15 @@ function svgEl(tag, attrs) {
   if (attrs) Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
   return e;
 }
+/* Set both href and xlink:href on an SVG <image>: plain href is the
+   modern spelling, but older Android WebViews (in-app browsers) and
+   SVG-as-image serialization (the poster PNG export) still expect
+   the xlink form — belt and braces so photos render everywhere. */
+var XLINK_NS = 'http://www.w3.org/1999/xlink';
+function setImageHref(img, url) {
+  img.setAttribute('href', url);
+  try { img.setAttributeNS(XLINK_NS, 'xlink:href', url); } catch (e) { /* ignore */ }
+}
 function project(lat, lng) { return [(lng - GEO.minLng) * K_LNG, GEO.maxLat - lat]; }
 function unproject(x, y) { return { lat: GEO.maxLat - y, lng: GEO.minLng + x / K_LNG }; }
 function geomToPath(geom) {
@@ -630,14 +639,15 @@ function renderPhotoFills(parts) {
     var parks = ALL_PARKS.filter(function (p) {
       return p.province === code && p.tier !== 'side';
     });
-    /* Empty cells: a whisper of alternating shade over the
-       province's progress colour, plus the puzzle-piece edge. */
-    parks.forEach(function (park, i) {
+    /* Empty cells: no fill at all, just a whisper-thin puzzle edge
+       over the province's progress colour — an empty slot should
+       read as a faint outline, never as a card floating on the map. */
+    parks.forEach(function (park) {
       var cell = CELLS[park.id];
       if (!cell) return;
       g.appendChild(svgEl('path', { d: cellPathD(cell),
-        fill: i % 2 ? 'rgba(122,84,33,0.055)' : 'rgba(255,255,255,0.14)',
-        stroke: 'rgba(91,58,30,0.38)', 'stroke-width': 0.055,
+        fill: 'none',
+        stroke: 'rgba(91,58,30,0.30)', 'stroke-width': 0.045,
         'stroke-linejoin': 'round' }));
     });
     /* Filled cells: the photo, cover-fit over the cell's bbox and
@@ -652,11 +662,11 @@ function renderPhotoFills(parts) {
       var img = svgEl('image', { x: cell.x0, y: cell.y0,
         width: cell.x1 - cell.x0, height: cell.y1 - cell.y0,
         preserveAspectRatio: 'xMidYMid slice' });
-      img.setAttribute('href', url);
+      setImageHref(img, url);
       cg.appendChild(img);
       g.appendChild(cg);
       g.appendChild(svgEl('path', { d: cellPathD(cell), fill: 'none',
-        stroke: 'rgba(255,253,244,0.95)', 'stroke-width': 0.075,
+        stroke: 'rgba(255,253,244,0.95)', 'stroke-width': 0.09,
         'stroke-linejoin': 'round' }));
     });
   });
@@ -672,11 +682,17 @@ function countryShrink(zoom) {
   t = Math.max(0, Math.min(1, t));
   return 0.74 + 0.26 * t;
 }
-function markerSize() { /* half-size of a main marker, in svg units */
-  var zoom = FULL.w / view.w;
-  var s = 0.46 * Math.pow(zoom, 0.42) * countryShrink(zoom);
-  if (focusCode) s *= 1.2;
-  return s;
+/* Radius of a main park marker, in svg units. Grows gently with
+   zoom, but is capped as a share of the view width: the old formula
+   let markers balloon past 40% of the screen at deep zoom, which
+   is exactly the giant-card pile the map used to drown in. */
+function mainMarkerRadius(zoom, interactive) {
+  var s = 0.40 * Math.pow(zoom, 0.36) * (interactive ? countryShrink(zoom) : 1);
+  if (interactive && focusCode) s *= 1.12;
+  return Math.min(s, (FULL.w / zoom) * 0.052);
+}
+function markerSize() { /* radius of a main marker at the live view */
+  return mainMarkerRadius(FULL.w / view.w, true);
 }
 function squareMarker(x, y, s, cls, glyph, glyphScale) {
   var g = svgEl('g', { 'class': 'park-marker' });
@@ -692,43 +708,98 @@ function squareMarker(x, y, s, cls, glyph, glyphScale) {
   g.appendChild(hit);
   return g;
 }
+function circleMarker(x, y, r, cls, glyph, glyphScale) {
+  var g = svgEl('g', { 'class': 'park-marker' });
+  g.appendChild(svgEl('circle', { cx: x + r * 0.14, cy: y + r * 0.18, r: r, 'class': 'mk-shadow' }));
+  g.appendChild(svgEl('circle', { cx: x, cy: y, r: r, 'class': cls,
+    'stroke-width': Math.max(0.05, r * 0.16) }));
+  if (glyph) {
+    var t = svgEl('text', { x: x, y: y, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+      'class': glyph === '?' ? 'mk-q' : 'mk-star', 'font-size': r * (glyphScale || 1.1) });
+    t.textContent = glyph;
+    g.appendChild(t);
+  }
+  var hit = svgEl('circle', { cx: x, cy: y, r: r * 1.8 + 0.15, 'class': 'hit' });
+  g.appendChild(hit);
+  return g;
+}
+/* Keeps a cluster of park markers readable: first shrink each
+   marker toward the gap to its nearest neighbour, then relax —
+   overlapping circles are pushed apart in small steps, capped so
+   no marker wanders far from its park's true position. Runs on
+   the interactive map only; the poster keeps true positions. */
+function declutterMarkers(items) {
+  items.forEach(function (a) {
+    var dMin = Infinity;
+    items.forEach(function (b) {
+      if (b === a) return;
+      var dx = a.ox - b.ox, dy = a.oy - b.oy, d = Math.sqrt(dx * dx + dy * dy);
+      if (d < dMin) dMin = d;
+    });
+    if (isFinite(dMin)) a.s = Math.max(a.s * 0.5, Math.min(a.s, dMin * 0.46));
+  });
+  for (var pass = 0; pass < 80; pass++) {
+    var moved = false;
+    for (var i = 0; i < items.length; i++) {
+      for (var j = i + 1; j < items.length; j++) {
+        var a = items[i], b = items[j];
+        var dx = b.x - a.x, dy = b.y - a.y;
+        var d = Math.sqrt(dx * dx + dy * dy);
+        var want = (a.s + b.s) * 1.07;
+        if (d >= want) continue;
+        if (d < 1e-6) {   /* coincident parks: pick a stable split direction */
+          dx = ((i * 37 + j * 17) % 10) - 5; dy = ((i * 53 + j * 29) % 10) - 5;
+          d = Math.sqrt(dx * dx + dy * dy) || 1;
+        }
+        var push = (want - d) / 2, ux = dx / d, uy = dy / d;
+        a.x -= ux * push; a.y -= uy * push;
+        b.x += ux * push; b.y += uy * push;
+        moved = true;
+      }
+    }
+    items.forEach(function (a) {
+      var dx = a.x - a.ox, dy = a.y - a.oy, d = Math.sqrt(dx * dx + dy * dy), cap = 0.9;
+      if (d > cap) { a.x = a.ox + dx / d * cap; a.y = a.oy + dy / d * cap; }
+    });
+    if (!moved) break;
+  }
+}
 function photoMarker(x, y, s, photo, ringCls, target) {
   var g = svgEl('g', { 'class': 'park-marker' });
   var id = 'qclip' + (++clipSeq);
   var defs = svgEl('defs');
   var cp = svgEl('clipPath', { id: id });
-  cp.appendChild(svgEl('rect', { x: x - s, y: y - s, width: s * 2, height: s * 2 }));
+  cp.appendChild(svgEl('circle', { cx: x, cy: y, r: s }));
   defs.appendChild(cp); g.appendChild(defs);
-  g.appendChild(svgEl('rect', { x: x - s + 0.1, y: y - s + 0.13, width: s * 2, height: s * 2, 'class': 'mk-shadow' }));
+  g.appendChild(svgEl('circle', { cx: x + s * 0.14, cy: y + s * 0.18, r: s, 'class': 'mk-shadow' }));
   var img = svgEl('image', { x: x - s, y: y - s, width: s * 2, height: s * 2,
     preserveAspectRatio: 'xMidYMid slice', 'clip-path': 'url(#' + id + ')' });
-  img.setAttribute('href', photo);
+  setImageHref(img, photo);
   g.appendChild(img);
-  g.appendChild(svgEl('rect', { x: x - s, y: y - s, width: s * 2, height: s * 2,
+  g.appendChild(svgEl('circle', { cx: x, cy: y, r: s,
     fill: 'none', 'class': ringCls, 'stroke-width': 0.13 }));
-  var hit = svgEl('rect', { x: x - s * 1.9, y: y - s * 1.9, width: s * 3.8, height: s * 3.8, 'class': 'hit' });
+  var hit = svgEl('circle', { cx: x, cy: y, r: s * 1.8 + 0.15, 'class': 'hit' });
   g.appendChild(hit);
   return g;
 }
 function questBadge(x, y, s, side) {
-  /* Pixel speech-bubble with a "!" that floats above an open quest's
-     marker. Only built for the focused province (see renderMarkersInto),
-     so the country view never fills with exclamation marks. The CSS
-     bounce anchors at the tail tip via transform-box: fill-box. */
-  var k = side ? 0.8 : 1;
-  var w = s * 1.2 * k, h = s * 1.55 * k;
-  var bx = x + s * 0.45, by = y - s * 1.45;   /* bubble bottom edge point */
-  var bubCls = side ? 'q-badge-bub-side' : 'q-badge-bub';
+  /* Round notification-style badge with a "!" riding on the top-
+     right rim of an open quest's marker: gold with a dark "!" for
+     main/bonus quests, smaller blue with a white "!" for side
+     quests. Only built for the focused province (see
+     renderMarkersInto), so the country view never fills with
+     exclamation marks. The CSS bounce anchors at the badge's
+     bottom via transform-box: fill-box. */
+  var rb = s * (side ? 0.48 : 0.58);
+  var bx = x + s * 0.74, by = y - s * 0.74;
   var g = svgEl('g', { 'class': 'quest-badge' });
-  g.appendChild(svgEl('rect', { x: bx - w / 2 + 0.07, y: by - h + 0.09, width: w, height: h,
-    rx: s * 0.24, 'class': 'mk-shadow' }));
-  g.appendChild(svgEl('polygon', { 'class': bubCls, 'stroke-width': 0.08,
-    points: (bx - w * 0.16) + ',' + by + ' ' + (bx + w * 0.16) + ',' + by +
-      ' ' + bx + ',' + (by + s * 0.45 * k) }));
-  g.appendChild(svgEl('rect', { x: bx - w / 2, y: by - h, width: w, height: h,
-    rx: s * 0.24, 'class': bubCls, 'stroke-width': 0.09 }));
-  var t = svgEl('text', { x: bx, y: by - h / 2, 'text-anchor': 'middle',
-    'dominant-baseline': 'central', 'font-size': h * 0.78,
+  g.appendChild(svgEl('circle', { cx: bx + rb * 0.12, cy: by + rb * 0.16, r: rb, 'class': 'mk-shadow' }));
+  g.appendChild(svgEl('circle', { cx: bx, cy: by, r: rb * 1.16, 'class': 'q-badge-halo' }));
+  g.appendChild(svgEl('circle', { cx: bx, cy: by, r: rb,
+    'class': side ? 'q-badge-c-side' : 'q-badge-c',
+    'stroke-width': Math.max(0.04, rb * 0.18) }));
+  var t = svgEl('text', { x: bx, y: by, 'text-anchor': 'middle',
+    'dominant-baseline': 'central', 'font-size': rb * 1.3,
     'class': side ? 'q-badge-txt q-badge-txt-side' : 'q-badge-txt' });
   t.textContent = '!';
   g.appendChild(t);
@@ -739,45 +810,60 @@ function questBadge(x, y, s, side) {
 }
 function bindTap(el, fn) {
   el.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
-  el.addEventListener('click', function (e) { e.stopPropagation(); fn(); });
+  el.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (suppressTap()) return;   /* a pinch just ended — not a tap */
+    fn();
+  });
 }
 function renderMarkersInto(parts, interactive, viewW) {
   while (parts.markers.firstChild) parts.markers.removeChild(parts.markers.firstChild);
   while (parts.camps.firstChild) parts.camps.removeChild(parts.camps.firstChild);
   if (parts.badges) while (parts.badges.firstChild) parts.badges.removeChild(parts.badges.firstChild);
   var zoom = FULL.w / (viewW || FULL.w);
-  var sMain = 0.46 * Math.pow(zoom, 0.42) * (interactive ? countryShrink(zoom) : 1) * (interactive && focusCode ? 1.2 : 1);
+  var sMain = mainMarkerRadius(zoom, interactive);
   /* Side-quest markers are the densest cluster on the map (ten in
      southern Ontario alone): on the interactive map they appear
      once a province is focused or the user zooms in. The poster
      always shows every marker. */
   var showSide = !interactive || !!focusCode || zoom >= 1.8;
+  /* Parks are round stamps, never photo thumbnails: a cleared
+     park's photo fills its own map cell instead (renderPhotoFills).
+     On the interactive map the stamps are laid out first and
+     decluttered, so parks that sit close together (southern
+     Ontario, the Maritimes) shrink and nudge apart instead of
+     stacking into an unreadable pile; the poster keeps every
+     stamp at its park's true position. */
+  var items = [];
   ALL_PARKS.forEach(function (park) {
     var side = park.tier === 'side';
     if (side && !showSide) return;
     var xy = project(park.lat, park.lng);
+    items.push({ park: park, side: side, x: xy[0], y: xy[1], ox: xy[0], oy: xy[1],
+      s: sMain * (side ? 0.76 : (park.tier === 'bonus' ? 0.9 : 1)) });
+  });
+  if (interactive && items.length > 1) declutterMarkers(items);
+  items.forEach(function (it) {
+    var park = it.park;
     var visit = state.visits[park.id];
     var bonus = park.tier === 'bonus';
-    /* Parks are stamps, never photo thumbnails: a cleared park's
-       photo fills its own map cell instead (renderPhotoFills). */
-    var s = sMain * (side ? 0.76 : (bonus ? 0.9 : 1));
     var g;
     if (visit) {
-      g = squareMarker(xy[0], xy[1], s,
-        side ? 'mk-done-side' : (bonus ? 'mk-done-bonus' : 'mk-done'), '★', 1.05);
+      g = circleMarker(it.x, it.y, it.s,
+        it.side ? 'mk-done-side' : (bonus ? 'mk-done-bonus' : 'mk-done'), '★', 1.0);
     } else {
-      g = squareMarker(xy[0], xy[1], s,
-        side ? 'mk-open-side' : (bonus ? 'mk-open-bonus' : 'mk-open'), '?', 1.15);
+      g = circleMarker(it.x, it.y, it.s,
+        it.side ? 'mk-open-side' : (bonus ? 'mk-open-bonus' : 'mk-open'), '?', 1.1);
     }
     if (interactive) {
       (function (pk) { bindTap(g, function () { openPark(pk); }); })(park);
       markerEls.push({ g: g });
     }
-    /* Open quests in the focused province get a bouncing "!" badge:
-       yellow for main/bonus quests, smaller blue for side quests.
+    /* Open quests in the focused province wear a round "!" badge:
+       gold for main/bonus quests, smaller blue for side quests.
        Badges live in their own top layer and are tappable too. */
     if (interactive && focusCode && park.province === focusCode && !visit && parts.badges) {
-      var bg = questBadge(xy[0], xy[1], s, side);
+      var bg = questBadge(it.x, it.y, it.s, it.side);
       (function (pk) { bindTap(bg, function () { openPark(pk); }); })(park);
       parts.badges.appendChild(bg);
     }
@@ -944,11 +1030,12 @@ function showTempCamp(lat, lng) {
   mapParts.temp.appendChild(g);
 }
 mapSvg.addEventListener('pointerdown', function (e) {
+  if (pinching) return;
   drag = { x: e.clientX, y: e.clientY, cx: view.cx, cy: view.cy, moved: false };
   cancelViewAnim();
 });
 mapSvg.addEventListener('pointermove', function (e) {
-  if (!drag) return;
+  if (!drag || pinching) return;
   var r = stageRect();
   var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
   if (Math.abs(dx) + Math.abs(dy) > 7) drag.moved = true;
@@ -960,7 +1047,7 @@ mapSvg.addEventListener('pointermove', function (e) {
   }
 });
 mapSvg.addEventListener('pointerup', function (e) {
-  if (!drag) return;
+  if (!drag || pinching) { drag = null; return; }
   var wasDrag = drag.moved;
   drag = null;
   if (wasDrag) return;
@@ -980,6 +1067,57 @@ mapSvg.addEventListener('pointerup', function (e) {
   openCampForm();
 });
 mapSvg.addEventListener('pointercancel', function () { drag = null; });
+
+/* ---------------- Pinch zoom (two fingers) ----------------
+   Pointer tracking runs in the capture phase on window, so a
+   second finger is registered even when it lands on a marker
+   (markers stop propagation of their own pointerdown). Zooming
+   reuses zoomAt() around the fingers' midpoint, so the map grows
+   from the pinch centre. While a pinch is active the single-
+   finger handlers above stand down, and taps stay suppressed
+   briefly after it ends — lifting a finger must never open a
+   quest card or pitch a tent by accident. The zoom buttons stay
+   as the one-handed alternative. */
+var activePtrs = {}, pinch = null, pinching = false, lastPinchEnd = 0;
+function suppressTap() { return pinching || (Date.now() - lastPinchEnd < 400); }
+function ptrList() { return Object.keys(activePtrs).map(function (k) { return activePtrs[k]; }); }
+window.addEventListener('pointerdown', function (e) {
+  if (!mapSvg.contains(e.target)) return;
+  activePtrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+  var pts = ptrList();
+  if (pts.length === 2) {
+    pinch = { lastD: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) };
+    pinching = true;
+    drag = null;
+    cancelViewAnim();
+  }
+}, true);
+window.addEventListener('pointermove', function (e) {
+  var rec = activePtrs[e.pointerId];
+  if (!rec) return;
+  rec.x = e.clientX; rec.y = e.clientY;
+  if (!pinching || !pinch) return;
+  var pts = ptrList();
+  if (pts.length !== 2) return;
+  var d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+  if (d > 0 && pinch.lastD > 0) {
+    var mid = clientToSvg({ clientX: (pts[0].x + pts[1].x) / 2,
+                            clientY: (pts[0].y + pts[1].y) / 2 });
+    if (mid) zoomAt(mid, pinch.lastD / d);
+    pinch.lastD = d;
+  }
+}, true);
+function endPointer(e) {
+  if (!activePtrs[e.pointerId]) return;
+  delete activePtrs[e.pointerId];
+  if (pinching && ptrList().length < 2) {
+    lastPinchEnd = Date.now();
+    pinch = null;
+    if (ptrList().length === 0) pinching = false;
+  }
+}
+window.addEventListener('pointerup', endPointer, true);
+window.addEventListener('pointercancel', endPointer, true);
 mapSvg.addEventListener('wheel', function (e) {
   e.preventDefault();
   var p = clientToSvg(e);
@@ -1413,6 +1551,7 @@ function savePosterPng() {
   var n = mainCleared();
   var clone = posterSvg.cloneNode(true);
   clone.setAttribute('xmlns', SVGNS);
+  clone.setAttribute('xmlns:xlink', XLINK_NS);
   var drawW = 1500;
   var drawH = Math.round(drawW * FULL.h / FULL.w);
   clone.setAttribute('width', drawW);

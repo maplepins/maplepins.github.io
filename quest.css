@@ -36,7 +36,7 @@ body{
     radial-gradient(120% 90% at 50% 0%, #fff8ec 0%, var(--paper) 55%, #fbeedd 100%);
   overflow:hidden;
 }
-#mapSvg{position:absolute;inset:0;filter:none}
+#mapSvg{position:absolute;inset:0;filter:none;touch-action:none}
 
 /* Generic pixel window (HUD bar, level-up popup) */
 .win{
@@ -179,7 +179,7 @@ body{
 .file-btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(74,44,18,.35)}
 .code-line .file-btn{margin-top:0}
 
-/* ---------- Map markers (pixel squares, hard shadows) ---------- */
+/* ---------- Map markers (round stamps, hard shadows) ---------- */
 .park-marker,.camp-marker{cursor:pointer}
 .park-marker .hit,.camp-marker .hit{fill:transparent}
 .mk-shadow{fill:rgba(74,44,18,.32)}
@@ -345,19 +345,23 @@ body{
 .burst-leaf svg{display:block}
 
 /* ---------- Quest "!" badges (focused province, open quests) ---------- */
+/* Round notification-style badges riding on the marker's rim:
+   gold circle + dark "!" for main/bonus, blue circle + white "!"
+   for side quests, with a pale halo so they read over photos. */
 .quest-badge{
   cursor:pointer;transform-box:fill-box;transform-origin:50% 100%;
   animation:qBounce 1.15s ease-in-out infinite;
 }
-.q-badge-bub{fill:#ffcf3f;stroke:#5b3a1e}
-.q-badge-bub-side{fill:#7ec3ee;stroke:#3d7ab5}
+.q-badge-c{fill:#ffcf3f;stroke:#5b3a1e}
+.q-badge-c-side{fill:#3d7ab5;stroke:#fffdf4}
+.q-badge-halo{fill:#fffdf4;opacity:.85}
 .q-badge-txt{font-weight:900;text-anchor:middle;pointer-events:none;fill:#5b3a1e}
-.q-badge-txt-side{fill:#1d4e79}
+.q-badge-txt-side{fill:#fff}
 @keyframes qBounce{
   0%,100%{transform:translateY(0) scale(1,1)}
-  30%{transform:translateY(-14%) scale(.95,1.06)}
-  55%{transform:translateY(0) scale(1.05,.93)}
-  75%{transform:translateY(-7%) scale(1,1)}
+  30%{transform:translateY(-9%) scale(.96,1.04)}
+  55%{transform:translateY(0) scale(1.03,.96)}
+  75%{transform:translateY(-5%) scale(1,1)}
 }
 
 @media (prefers-reduced-motion: reduce){
