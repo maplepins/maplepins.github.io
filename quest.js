@@ -339,7 +339,7 @@ function provinceFill(code) {
 }
 function buildSvgView(svg, isMain) {
   var viewKey = isMain ? 'm' : 'p';
-  var parts = { paths:{}, labels:null, markers:null, camps:null, temp:null,
+  var parts = { paths:{}, labels:null, markers:null, camps:null, temp:null, badges:null,
     labelEls:{}, fillGroups:{}, outlines:{}, viewKey: viewKey };
   /* Clips: one per province (its outline) and one per park cell.
      Ids are prefixed per view so map and poster never collide. */
@@ -386,6 +386,10 @@ function buildSvgView(svg, isMain) {
     gOut.appendChild(o);
   });
   svg.appendChild(gOut);
+  /* Decorative pixel maple trees printed on the map's bottom ocean
+     corners, like illustrations on an old game map. Living inside the
+     SVG means they can never collide with the HUD or dock chrome. */
+  addMapTrees(svg);
   parts.labels = svgEl('g');
   GEO.features.forEach(function (f) {
     var anchor = LABEL_ANCHOR[f.code]
@@ -402,10 +406,69 @@ function buildSvgView(svg, isMain) {
   svg.appendChild(parts.labels);
   parts.markers = svgEl('g'); svg.appendChild(parts.markers);
   parts.camps = svgEl('g'); svg.appendChild(parts.camps);
+  /* Quest "!" badges float above every marker and label (interactive
+     map only — renderMarkersInto leaves this empty for the poster). */
+  parts.badges = svgEl('g'); svg.appendChild(parts.badges);
   if (isMain) { parts.temp = svgEl('g'); svg.appendChild(parts.temp); }
   svg.setAttribute('viewBox', FULL.x + ' ' + FULL.y + ' ' + FULL.w + ' ' + FULL.h);
   return parts;
 }
+/* ---------------- Pixel maple trees (map decoration) ----------------
+   One 14×15 pixel grid, two autumn palettes. Drawn with plain rects
+   inside the SVG, so the trees pan/zoom with the map like artwork
+   printed on it — and show up on the poster too. */
+var TREE_GRID = [
+  '.....YY.......',
+  '....YOOY......',
+  '...YOOOOY.....',
+  '..YOOOOOOY....',
+  '..ROOOOOR.....',
+  '.ROOOOOOOOR...',
+  '.ROoOOOOoOR...',
+  '.ROOOOOOOOR...',
+  '..ROOOOOOR....',
+  '...ROOOOR.....',
+  '....ROOR......',
+  '.....TT.......',
+  '.....TT.......',
+  '....TTTT......',
+  '..gggggggg....'
+];
+var TREE_PALETTE_A = { Y:'#f2c230', O:'#e8862e', o:'#f5a83d', R:'#d94f4f', T:'#7a4a21', g:'#3e7d32' };
+var TREE_PALETTE_B = { Y:'#f2c230', O:'#d94f4f', o:'#ef6f3c', R:'#e8862e', T:'#7a4a21', g:'#3e7d32' };
+function pixelTree(cell, palette) {
+  var g = svgEl('g');
+  TREE_GRID.forEach(function (row, ry) {
+    for (var rx = 0; rx < 14; rx++) {
+      var c = palette[row[rx] || '.'];
+      if (!c) continue;
+      g.appendChild(svgEl('rect', { x: rx * cell, y: ry * cell,
+        width: cell * 1.04, height: cell * 1.04, fill: c }));
+    }
+  });
+  return g;
+}
+function addMapTrees(svg) {
+  if (!FULL) return;
+  var g = svgEl('g');
+  g.style.pointerEvents = 'none';
+  var base = FULL.y + FULL.h * 0.995;   /* southern edge of the land bounds */
+  function place(palette, heightFrac, cx, mirror) {
+    var th = FULL.h * heightFrac, cell = th / TREE_GRID.length;
+    var t = pixelTree(cell, palette);
+    var w = cell * 14;
+    var x = mirror ? cx - w : cx;
+    t.setAttribute('transform', 'translate(' + x + ' ' + (base - th) + ')');
+    g.appendChild(t);
+  }
+  /* Bottom-left: a big orange tree with a smaller red one beside it.
+     Bottom-right: one red tree. All three sit in open ocean corners. */
+  place(TREE_PALETTE_A, 0.088, FULL.x + FULL.w * 0.012, false);
+  place(TREE_PALETTE_B, 0.06, FULL.x + FULL.w * 0.012 + FULL.h * 0.088 / TREE_GRID.length * 15.2, false);
+  place(TREE_PALETTE_B, 0.074, FULL.x + FULL.w * 0.988, true);
+  svg.appendChild(g);
+}
+
 function refreshProvinceFills() {
   [mapParts, posterParts].forEach(function (parts) {
     if (!parts) return;
@@ -647,6 +710,33 @@ function photoMarker(x, y, s, photo, ringCls, target) {
   g.appendChild(hit);
   return g;
 }
+function questBadge(x, y, s, side) {
+  /* Pixel speech-bubble with a "!" that floats above an open quest's
+     marker. Only built for the focused province (see renderMarkersInto),
+     so the country view never fills with exclamation marks. The CSS
+     bounce anchors at the tail tip via transform-box: fill-box. */
+  var k = side ? 0.8 : 1;
+  var w = s * 1.2 * k, h = s * 1.55 * k;
+  var bx = x + s * 0.45, by = y - s * 1.45;   /* bubble bottom edge point */
+  var bubCls = side ? 'q-badge-bub-side' : 'q-badge-bub';
+  var g = svgEl('g', { 'class': 'quest-badge' });
+  g.appendChild(svgEl('rect', { x: bx - w / 2 + 0.07, y: by - h + 0.09, width: w, height: h,
+    rx: s * 0.24, 'class': 'mk-shadow' }));
+  g.appendChild(svgEl('polygon', { 'class': bubCls, 'stroke-width': 0.08,
+    points: (bx - w * 0.16) + ',' + by + ' ' + (bx + w * 0.16) + ',' + by +
+      ' ' + bx + ',' + (by + s * 0.45 * k) }));
+  g.appendChild(svgEl('rect', { x: bx - w / 2, y: by - h, width: w, height: h,
+    rx: s * 0.24, 'class': bubCls, 'stroke-width': 0.09 }));
+  var t = svgEl('text', { x: bx, y: by - h / 2, 'text-anchor': 'middle',
+    'dominant-baseline': 'central', 'font-size': h * 0.78,
+    'class': side ? 'q-badge-txt q-badge-txt-side' : 'q-badge-txt' });
+  t.textContent = '!';
+  g.appendChild(t);
+  /* Desync the bounce so a province full of quests doesn't pulse as one. */
+  g.style.animationDelay =
+    (Math.abs(Math.sin(x * 12.9898 + y * 78.233)) * 0.9).toFixed(2) + 's';
+  return g;
+}
 function bindTap(el, fn) {
   el.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
   el.addEventListener('click', function (e) { e.stopPropagation(); fn(); });
@@ -654,6 +744,7 @@ function bindTap(el, fn) {
 function renderMarkersInto(parts, interactive, viewW) {
   while (parts.markers.firstChild) parts.markers.removeChild(parts.markers.firstChild);
   while (parts.camps.firstChild) parts.camps.removeChild(parts.camps.firstChild);
+  if (parts.badges) while (parts.badges.firstChild) parts.badges.removeChild(parts.badges.firstChild);
   var zoom = FULL.w / (viewW || FULL.w);
   var sMain = 0.46 * Math.pow(zoom, 0.42) * (interactive ? countryShrink(zoom) : 1) * (interactive && focusCode ? 1.2 : 1);
   /* Side-quest markers are the densest cluster on the map (ten in
@@ -681,6 +772,14 @@ function renderMarkersInto(parts, interactive, viewW) {
     if (interactive) {
       (function (pk) { bindTap(g, function () { openPark(pk); }); })(park);
       markerEls.push({ g: g });
+    }
+    /* Open quests in the focused province get a bouncing "!" badge:
+       yellow for main/bonus quests, smaller blue for side quests.
+       Badges live in their own top layer and are tappable too. */
+    if (interactive && focusCode && park.province === focusCode && !visit && parts.badges) {
+      var bg = questBadge(xy[0], xy[1], s, side);
+      (function (pk) { bindTap(bg, function () { openPark(pk); }); })(park);
+      parts.badges.appendChild(bg);
     }
     parts.markers.appendChild(g);
   });
@@ -807,6 +906,7 @@ function focusProvince(code) {
   if (!f) return;
   focusCode = code;
   refreshFocusUI();
+  renderMap();   /* quest "!" badges appear for this province right away */
   var r = stageRect();
   var bw = f.bounds.x1 - f.bounds.x0, bh = f.bounds.y1 - f.bounds.y0;
   var tw = Math.max(bw * 1.3, bh * 1.3 * (r.width / Math.max(r.height, 1)));
@@ -818,6 +918,7 @@ function exitFocus() {
   focusCode = null;
   clearTempCamp();
   refreshFocusUI();
+  renderMap();   /* and the "!" badges go away with the focus */
   animateViewTo(FULL.x + FULL.w / 2, FULL.y + FULL.h / 2, fitWidth(), 650);
 }
 function focusLatLng(lat, lng, w) {
@@ -930,6 +1031,7 @@ function playClearFx(leveledTo, floatText) {
   $('expFloat').textContent = floatText || '+100 EXP';
   var fx = $('stampFx');
   fx.hidden = false;
+  spawnLeafBurst();
   setTimeout(function () { fx.hidden = true; }, 1650);
   if (leveledTo) {
     $('lvlBody').textContent = 'Explorer Lv.' + leveledTo;
@@ -938,6 +1040,84 @@ function playClearFx(leveledTo, floatText) {
       lf.hidden = false;
       setTimeout(function () { lf.hidden = true; }, 2450);
     }, 1000);
+  }
+}
+
+/* ---------------- Maple ambience: settings, falling leaves, bursts --------
+   Kept in its own localStorage key so the quest save shape never
+   changes. Leaves are pure decoration: pointer-events none, clipped
+   to the map frame, and skipped entirely for reduced motion. */
+var SETTINGS_KEY = 'maplepins_quest_settings_v1';
+var settings = { leaves: true };
+var REDUCED_MOTION = !!(window.matchMedia &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+function loadSettings() {
+  try {
+    var d = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+    if (d && typeof d.leaves === 'boolean') settings.leaves = d.leaves;
+  } catch (e) { /* default: on */ }
+}
+function saveSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
+  catch (e) { /* ignore */ }
+}
+var LEAF_COLORS = ['#d94f4f', '#e2543e', '#e8862e', '#f09a3e', '#f2c230', '#c93b3b'];
+var LEAF_PATH = 'M50 0 L57 18 L74 8 L70 27 L90 20 L79 38 L97 42 L83 52 L93 68 ' +
+  'L73 63 L58 78 L53 100 L47 100 L42 78 L27 63 L7 68 L17 52 L3 42 L21 38 ' +
+  'L10 20 L30 27 L26 8 L43 18 Z';
+function leafSvg(color, size) {
+  return '<svg viewBox="0 0 100 100" width="' + size + '" height="' + size +
+    '" aria-hidden="true"><path d="' + LEAF_PATH + '" fill="' + color + '"/></svg>';
+}
+function leavesActive() { return settings.leaves && !REDUCED_MOTION; }
+function buildLeaves() {
+  var layer = $('leafLayer');
+  if (!layer || layer.childNodes.length) return;
+  for (var i = 0; i < 12; i++) {
+    var leaf = document.createElement('span');
+    leaf.className = 'leaf';
+    leaf.style.left = (Math.random() * 96) + '%';
+    leaf.style.opacity = (0.45 + Math.random() * 0.35).toFixed(2);
+    leaf.style.animationDuration = (9 + Math.random() * 9).toFixed(1) + 's';
+    leaf.style.animationDelay = (-Math.random() * 18).toFixed(1) + 's';
+    var inner = document.createElement('span');
+    inner.className = 'leaf-in';
+    inner.style.animationDuration = (1.6 + Math.random() * 1.8).toFixed(1) + 's';
+    inner.style.animationDelay = (-Math.random() * 3).toFixed(1) + 's';
+    inner.innerHTML = leafSvg(LEAF_COLORS[i % LEAF_COLORS.length],
+      Math.round(13 + Math.random() * 17));
+    leaf.appendChild(inner);
+    layer.appendChild(leaf);
+  }
+}
+function applyLeaves() {
+  var layer = $('leafLayer');
+  if (!layer) return;
+  if (leavesActive()) { buildLeaves(); layer.hidden = false; }
+  else layer.hidden = true;
+}
+function spawnLeafBurst() {
+  var layer = $('burstLayer');
+  if (!layer || !leavesActive()) return;
+  for (var i = 0; i < 10; i++) {
+    var el = document.createElement('span');
+    el.className = 'burst-leaf';
+    el.innerHTML = leafSvg(
+      LEAF_COLORS[Math.floor(Math.random() * LEAF_COLORS.length)],
+      Math.round(11 + Math.random() * 10));
+    layer.appendChild(el);
+    if (typeof el.animate !== 'function') { el.remove(); continue; }
+    var ang = Math.random() * Math.PI * 2;
+    var dist = 60 + Math.random() * 130;
+    var dx = Math.cos(ang) * dist;
+    var dy = Math.sin(ang) * dist * 0.8 + 40;   /* slight downward drift */
+    var rot = Math.round(Math.random() * 260 - 130);
+    var anim = el.animate([
+      { transform: 'translate(-50%,-50%) rotate(0deg)', opacity: 1 },
+      { transform: 'translate(calc(-50% + ' + Math.round(dx) + 'px), calc(-50% + ' +
+          Math.round(dy) + 'px)) rotate(' + rot + 'deg)', opacity: 0 }
+    ], { duration: 950 + Math.random() * 550, easing: 'cubic-bezier(.17,.67,.35,1)' });
+    (function (node, a) { a.onfinish = function () { node.remove(); }; })(el, anim);
   }
 }
 
@@ -1338,6 +1518,11 @@ $('zoomOut').addEventListener('click', function () {
   zoomAt({ x: view.cx, y: view.cy }, 1.6);
 });
 $('zoomReset').addEventListener('click', exitFocus);
+$('leafToggle').addEventListener('change', function () {
+  settings.leaves = $('leafToggle').checked;
+  saveSettings();
+  applyLeaves();
+});
 $('resetBtn').addEventListener('click', function () {
   if (!confirm('Reset the whole quest? All visits, photos and campsites on this device will be cleared.')) return;
   state.visits = {};
@@ -1352,6 +1537,9 @@ window.addEventListener('resize', function () { if (FULL) applyView(); });
 /* ---------------- Init ---------------- */
 (async function init() {
   loadState();
+  loadSettings();
+  $('leafToggle').checked = settings.leaves;
+  applyLeaves();
   try {
     await loadGeo();
   } catch (e) {

@@ -21,6 +21,8 @@
   <div id="mapFrame">
     <svg id="mapSvg" preserveAspectRatio="xMidYMid meet" role="img"
          aria-label="Illustrated map of Canada with all 48 national parks & reserves — tap a province to zoom in, tap a park marker to open its quest card"></svg>
+    <!-- Falling maple leaves: ambient layer clipped to the frame, never intercepts taps -->
+    <div id="leafLayer" aria-hidden="true"></div>
   </div>
 
   <!-- Top HUD bar: brand + explorer level + EXP bar + side counters -->
@@ -60,6 +62,7 @@
   </div>
 
   <!-- Clear FX: stamp + floating EXP, then a level-up window -->
+  <div id="burstLayer" aria-hidden="true"></div>
   <div id="stampFx" class="stamp-fx" hidden>
     <div class="stamp-badge">QUEST CLEAR</div>
     <div class="exp-float" id="expFloat">+100 EXP</div>
@@ -213,6 +216,11 @@
     <button class="sheet-close win-x" type="button" data-close aria-label="Close">✕</button></div>
   <div class="win-body">
     <h2 class="setup-h">Settings ⚙️</h2>
+    <h3 class="sheet-sub">Ambience</h3>
+    <div class="toggle-row">
+      <span>Falling maple leaves 🍁<small>Leaves drift over the map, and clearing a park bursts them into the air.</small></span>
+      <label class="switch"><input type="checkbox" id="leafToggle" checked><span class="slider"></span></label>
+    </div>
     <h3 class="sheet-sub">About this quest</h3>
     <p class="hint">Main quest: the 48 places of the Parks Canada system — 37 national parks and 11 national park reserves. Bonus: Rouge, Canada's only National Urban Park, sits outside the 48 and never counts toward your level. Side quests: curated provincial parks — Ontario set included. Demo data lives only in this browser (localStorage).</p>
     <h3 class="sheet-sub">Start over</h3>

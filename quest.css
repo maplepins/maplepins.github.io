@@ -191,6 +191,9 @@ body{
 .mk-star{fill:#fff;font-weight:800;text-anchor:middle;pointer-events:none}
 .mk-photo{stroke:#ef6f6c}
 .mk-photo-side{stroke:var(--sky-d)}
+.mk-open-bonus{fill:#fdf3d8;stroke:#c9932b}
+.mk-done-bonus{fill:#e8b23f;stroke:#fffdf4}
+.mk-photo-bonus{stroke:#c9932b}
 .mk-camp{fill:#e9f4e2;stroke:var(--grass-d)}
 .mk-temp{fill:#fffdf4;stroke:var(--grass-d);stroke-dasharray:.3 .18}
 #mapSvg text{font-family:var(--round-font)}
@@ -250,6 +253,8 @@ body{
 }
 .park-medal.done{background:#fdeceb;color:#d94f4f}
 .park-medal.side{border-color:var(--sky-d)}
+.park-medal.bonus{border-color:#c9932b}
+.side-chip.bonus{background:#fdf3d8;border-color:#c9932b}
 .park-head h2{margin:0;font-size:1.25rem}
 .park-sub{margin:.15rem 0 0;color:#8a6b45;font-size:.82rem;font-weight:700}
 .park-blurb{font-size:.95rem;line-height:1.5;margin:.4rem 0 .6rem}
@@ -308,3 +313,54 @@ body{
 .poster-names{margin-top:.7rem;font-size:.8rem;color:var(--muted);line-height:1.55;text-align:center}
 .poster-names strong{color:var(--ink)}
 .setup-h{margin-top:0}
+
+/* ---------- Maple ambience: falling leaves + clear burst ---------- */
+/* The layer lives inside #mapFrame (overflow:hidden), so leaves are
+   clipped to the map area. No z-index and a DOM position right after
+   the SVG keeps it above the map but below the HUD, dock, backdrop
+   and sheets — and pointer-events:none means it never eats a tap. */
+#leafLayer{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+#leafLayer[hidden]{display:none}
+.leaf{
+  position:absolute;top:-9%;left:0;display:block;pointer-events:none;
+  animation-name:leafFall;animation-timing-function:linear;
+  animation-iteration-count:infinite;will-change:transform;
+}
+.leaf-in{
+  display:block;animation-name:leafSway;animation-timing-function:ease-in-out;
+  animation-iteration-count:infinite;animation-direction:alternate;
+}
+.leaf-in svg{display:block}
+@keyframes leafFall{
+  from{transform:translate3d(0,0,0)}
+  to{transform:translate3d(1.5rem,112vh,0)}
+}
+@keyframes leafSway{
+  from{transform:translateX(-13px) rotate(-40deg)}
+  to{transform:translateX(13px) rotate(40deg)}
+}
+/* Clear burst: leaves pop from screen centre, under the stamp (z 30). */
+#burstLayer{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:29}
+.burst-leaf{position:absolute;left:50%;top:44%;display:block;pointer-events:none}
+.burst-leaf svg{display:block}
+
+/* ---------- Quest "!" badges (focused province, open quests) ---------- */
+.quest-badge{
+  cursor:pointer;transform-box:fill-box;transform-origin:50% 100%;
+  animation:qBounce 1.15s ease-in-out infinite;
+}
+.q-badge-bub{fill:#ffcf3f;stroke:#5b3a1e}
+.q-badge-bub-side{fill:#7ec3ee;stroke:#3d7ab5}
+.q-badge-txt{font-weight:900;text-anchor:middle;pointer-events:none;fill:#5b3a1e}
+.q-badge-txt-side{fill:#1d4e79}
+@keyframes qBounce{
+  0%,100%{transform:translateY(0) scale(1,1)}
+  30%{transform:translateY(-14%) scale(.95,1.06)}
+  55%{transform:translateY(0) scale(1.05,.93)}
+  75%{transform:translateY(-7%) scale(1,1)}
+}
+
+@media (prefers-reduced-motion: reduce){
+  #leafLayer{display:none}
+  .quest-badge{animation:none}
+}
