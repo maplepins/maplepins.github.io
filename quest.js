@@ -1200,9 +1200,9 @@ function saveSettings() {
   catch (e) { /* ignore */ }
 }
 var LEAF_COLORS = ['#d94f4f', '#e2543e', '#e8862e', '#f09a3e', '#f2c230', '#c93b3b'];
-var LEAF_PATH = 'M50 0 L57 18 L74 8 L70 27 L90 20 L79 38 L97 42 L83 52 L93 68 ' +
-  'L73 63 L58 78 L53 100 L47 100 L42 78 L27 63 L7 68 L17 52 L3 42 L21 38 ' +
-  'L10 20 L30 27 L26 8 L43 18 Z';
+var LEAF_PATH = 'M50 1 L57 14 L66 7 L65 21 L79 13 L77 28 L92 30 L83 42 ' +
+  'L91 56 L75 54 L66 72 L53 74 L53 96 L47 96 L47 74 L34 72 L25 54 L9 56 ' +
+  'L17 42 L8 30 L23 28 L21 13 L35 21 L34 7 L43 14 Z';
 function leafSvg(color, size) {
   return '<svg viewBox="0 0 100 100" width="' + size + '" height="' + size +
     '" aria-hidden="true"><path d="' + LEAF_PATH + '" fill="' + color + '"/></svg>';
