@@ -85,6 +85,7 @@ body{
   padding:.22rem .5rem;box-shadow:0 2px 0 rgba(74,44,18,.3);
 }
 .side-chip.camp{background:#e9f4e2;border-color:var(--grass-d)}
+.side-chip.sample{background:#fdf3d8;border-color:#c9932b;border-style:dashed}
 
 /* ---------- Frame chrome: zoom tools, back button, hint ---------- */
 .map-tools{bottom:calc(9.2rem + env(safe-area-inset-bottom))}
@@ -362,6 +363,24 @@ body{
   30%{transform:translateY(-9%) scale(.96,1.04)}
   55%{transform:translateY(0) scale(1.03,.96)}
   75%{transform:translateY(-5%) scale(1,1)}
+}
+
+/* ---------- Keyboard focus (markers are buttons too) ---------- */
+/* HTML chrome gets a chunky sky outline; SVG markers can't use
+   outline, so a focused marker's ring turns sky blue instead —
+   visible at any zoom without moving a single pixel of layout. */
+.gbtn:focus-visible,.gbtn-wide:focus-visible,.gbtn-small:focus-visible,
+.tab:focus-visible,.quest-row:focus-visible,.tool-btn:focus-visible,
+.back-btn:focus-visible,.win-x:focus-visible,.file-btn:focus-visible{
+  outline:3px solid var(--sky-d);outline-offset:2px;
+}
+.park-marker:focus,.camp-marker:focus{outline:none}
+.park-marker:focus .mk-open,.park-marker:focus .mk-open-side,
+.park-marker:focus .mk-open-bonus,.park-marker:focus .mk-done,
+.park-marker:focus .mk-done-side,.park-marker:focus .mk-done-bonus,
+.park-marker:focus .mk-photo,.camp-marker:focus .mk-camp,
+.camp-marker:focus .mk-photo{
+  stroke:var(--sky-d);
 }
 
 @media (prefers-reduced-motion: reduce){

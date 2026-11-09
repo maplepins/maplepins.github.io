@@ -155,10 +155,13 @@ var SAMPLE_VISITS = {
    counters always filter by tier). camps: FREE personal spots, kept
    in a fully separate array — never mixed into quest counts. */
 var LS_KEY = 'maplepins_quest_v1';
-var state = { visits:{}, camps:[] };
+var state = { visits:{}, camps:[], samplesActive:false };
+function statePayload() {
+  return { visits: state.visits, camps: state.camps,
+           seeded: true, samples: state.samplesActive };
+}
 function saveState() {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(
-    { visits: state.visits, camps: state.camps, seeded: true })); }
+  try { localStorage.setItem(LS_KEY, JSON.stringify(statePayload())); }
   catch (e) { /* storage full/blocked — state stays in memory */ }
 }
 function loadState() {
@@ -167,6 +170,7 @@ function loadState() {
   if (!raw) {
     state.visits = JSON.parse(JSON.stringify(SAMPLE_VISITS));
     state.camps = [];
+    state.samplesActive = true;   /* first run: these stamps are demos */
     saveState();
     return;
   }
@@ -174,7 +178,8 @@ function loadState() {
     var d = JSON.parse(raw);
     state.visits = d.visits || {};
     state.camps = Array.isArray(d.camps) ? d.camps : [];
-  } catch (e) { state.visits = {}; state.camps = []; }
+    state.samplesActive = !!d.samples;
+  } catch (e) { state.visits = {}; state.camps = []; state.samplesActive = false; }
 }
 function mainCleared() {
   return PARKS_MAIN.filter(function (p) { return !!state.visits[p.id]; }).length;
@@ -729,6 +734,7 @@ function circleMarker(x, y, r, cls, glyph, glyphScale) {
    no marker wanders far from its park's true position. Runs on
    the interactive map only; the poster keeps true positions. */
 function declutterMarkers(items) {
+  items.forEach(function (a) { a.s0 = a.s; });
   items.forEach(function (a) {
     var dMin = Infinity;
     items.forEach(function (b) {
@@ -738,30 +744,59 @@ function declutterMarkers(items) {
     });
     if (isFinite(dMin)) a.s = Math.max(a.s * 0.5, Math.min(a.s, dMin * 0.46));
   });
-  for (var pass = 0; pass < 80; pass++) {
-    var moved = false;
-    for (var i = 0; i < items.length; i++) {
-      for (var j = i + 1; j < items.length; j++) {
-        var a = items[i], b = items[j];
-        var dx = b.x - a.x, dy = b.y - a.y;
-        var d = Math.sqrt(dx * dx + dy * dy);
-        var want = (a.s + b.s) * 1.07;
-        if (d >= want) continue;
-        if (d < 1e-6) {   /* coincident parks: pick a stable split direction */
-          dx = ((i * 37 + j * 17) % 10) - 5; dy = ((i * 53 + j * 29) % 10) - 5;
-          d = Math.sqrt(dx * dx + dy * dy) || 1;
+  function relax(maxPasses) {
+    for (var pass = 0; pass < maxPasses; pass++) {
+      var moved = false;
+      for (var i = 0; i < items.length; i++) {
+        for (var j = i + 1; j < items.length; j++) {
+          var a = items[i], b = items[j];
+          var dx = b.x - a.x, dy = b.y - a.y;
+          var d = Math.sqrt(dx * dx + dy * dy);
+          var want = (a.s + b.s) * 1.07;
+          if (d >= want) continue;
+          if (d < 1e-6) {   /* coincident parks: pick a stable split direction */
+            dx = ((i * 37 + j * 17) % 10) - 5; dy = ((i * 53 + j * 29) % 10) - 5;
+            d = Math.sqrt(dx * dx + dy * dy) || 1;
+          }
+          var push = (want - d) / 2, ux = dx / d, uy = dy / d;
+          a.x -= ux * push; a.y -= uy * push;
+          b.x += ux * push; b.y += uy * push;
+          moved = true;
         }
-        var push = (want - d) / 2, ux = dx / d, uy = dy / d;
-        a.x -= ux * push; a.y -= uy * push;
-        b.x += ux * push; b.y += uy * push;
-        moved = true;
+      }
+      items.forEach(function (a) {
+        var dx = a.x - a.ox, dy = a.y - a.oy, d = Math.sqrt(dx * dx + dy * dy), cap = 0.9;
+        if (d > cap) { a.x = a.ox + dx / d * cap; a.y = a.oy + dy / d * cap; }
+      });
+      if (!moved) break;
+    }
+  }
+  relax(80);
+  /* Dense clusters (the Maritimes, southern Ontario) can still end
+     up overlapping once every marker sits at its 0.9-unit drift
+     cap — pushing harder would lie about park positions. Instead,
+     shrink the markers that are still touching, a step at a time,
+     and relax again. Floor: half the intended size, so a stamp
+     never shrinks into invisibility. */
+  for (var round = 0; round < 14; round++) {
+    var touching = {};
+    var anyTouch = false;
+    for (var i2 = 0; i2 < items.length; i2++) {
+      for (var j2 = i2 + 1; j2 < items.length; j2++) {
+        var p = items[i2], q = items[j2];
+        var ddx = q.x - p.x, ddy = q.y - p.y;
+        var dd = Math.sqrt(ddx * ddx + ddy * ddy);
+        if (dd < (p.s + q.s) * 1.02) {
+          touching[i2] = touching[j2] = true;
+          anyTouch = true;
+        }
       }
     }
-    items.forEach(function (a) {
-      var dx = a.x - a.ox, dy = a.y - a.oy, d = Math.sqrt(dx * dx + dy * dy), cap = 0.9;
-      if (d > cap) { a.x = a.ox + dx / d * cap; a.y = a.oy + dy / d * cap; }
+    if (!anyTouch) break;
+    items.forEach(function (a, idx) {
+      if (touching[idx]) a.s = Math.max(a.s * 0.92, a.s0 * 0.5);
     });
-    if (!moved) break;
+    relax(24);
   }
 }
 function photoMarker(x, y, s, photo, ringCls, target) {
@@ -856,7 +891,21 @@ function renderMarkersInto(parts, interactive, viewW) {
         it.side ? 'mk-open-side' : (bonus ? 'mk-open-bonus' : 'mk-open'), '?', 1.1);
     }
     if (interactive) {
-      (function (pk) { bindTap(g, function () { openPark(pk); }); })(park);
+      (function (pk) {
+        bindTap(g, function () { openPark(pk); });
+        /* Keyboard: a marker is a button — focusable, labelled,
+           and Enter/Space opens the same quest card as a tap. */
+        g.setAttribute('tabindex', '0');
+        g.setAttribute('role', 'button');
+        g.setAttribute('aria-label',
+          pk.name + (visit ? ' — cleared' : ' — open quest'));
+        g.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openPark(pk);
+          }
+        });
+      })(park);
       markerEls.push({ g: g });
     }
     /* Open quests in the focused province wear a round "!" badge:
@@ -882,7 +931,18 @@ function renderMarkersInto(parts, interactive, viewW) {
       g.setAttribute('class', 'camp-marker');
     }
     if (interactive) {
-      (function (cp) { bindTap(g, function () { openCampView(cp); }); })(camp);
+      (function (cp) {
+        bindTap(g, function () { openCampView(cp); });
+        g.setAttribute('tabindex', '0');
+        g.setAttribute('role', 'button');
+        g.setAttribute('aria-label', cp.name + ' — my campsite');
+        g.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openCampView(cp);
+          }
+        });
+      })(camp);
       markerEls.push({ g: g });
     }
     parts.camps.appendChild(g);
@@ -904,6 +964,26 @@ function fitWidth() {
   return Math.max(FULL.w, FULL.h * (r.width / Math.max(r.height, 1)));
 }
 var lastMarkerW = 0;
+/* Marker re-renders are coalesced into one per animation frame,
+   and — crucially — a zoom-driven re-render rebuilds ONLY the
+   markers. The photo-cell layer doesn't depend on the view at
+   all, so the old code tore down and rebuilt every photo fill
+   (plus an 80-pass declutter) on every pinch frame for nothing. */
+var markerRenderQueued = false;
+function queueMarkerRender() {
+  if (markerRenderQueued) return;
+  markerRenderQueued = true;
+  requestAnimationFrame(function () {
+    markerRenderQueued = false;
+    renderMarkersOnly();
+  });
+}
+function renderMarkersOnly() {
+  if (!mapParts) return;
+  markerEls = [];
+  lastMarkerW = view.w;
+  renderMarkersInto(mapParts, true, view.w);
+}
 function applyView() {
   if (!FULL) return;
   var r = stageRect();
@@ -920,10 +1000,10 @@ function applyView() {
     el.setAttribute('stroke-width', fs * 0.16);
   });
   /* Rebuilding every marker each frame would flicker photo thumbnails;
-     only re-render once the zoom has drifted a few percent. */
+     only re-render once the zoom has drifted a few percent — and even
+     then, at most once per frame and markers only (see above). */
   if (!lastMarkerW || Math.abs(view.w - lastMarkerW) > lastMarkerW * 0.03) {
-    lastMarkerW = view.w;
-    renderMap();
+    queueMarkerRender();
   }
 }
 function clampView() {
@@ -990,7 +1070,9 @@ function refreshFocusUI() {
 function focusProvince(code) {
   var f = GEO_BY_CODE[code];
   if (!f) return;
+  var hadFocus = !!focusCode;
   focusCode = code;
+  if (!hadFocus) layerPush('focus');   /* back button un-focuses first */
   refreshFocusUI();
   renderMap();   /* quest "!" badges appear for this province right away */
   var r = stageRect();
@@ -999,9 +1081,10 @@ function focusProvince(code) {
   tw = Math.min(Math.max(tw, FULL.w / 30), fitWidth());
   animateViewTo((f.bounds.x0 + f.bounds.x1) / 2, (f.bounds.y0 + f.bounds.y1) / 2, tw, 650);
 }
-function exitFocus() {
+function exitFocus(fromPop) {
   if (!GEO || !FULL) return;
   focusCode = null;
+  if (!fromPop) layerPopUI('focus');
   clearTempCamp();
   refreshFocusUI();
   renderMap();   /* and the "!" badges go away with the focus */
@@ -1130,18 +1213,57 @@ mapSvg.addEventListener('dblclick', function (e) {
 
 /* ---------------- Sheets ---------------- */
 var SHEETS = ['parkSheet', 'campSheet', 'journalSheet', 'posterSheet', 'settingsSheet'];
+function anySheetOpen() {
+  return SHEETS.some(function (s) { return !$(s).hidden; });
+}
+
+/* ---------------- Back-button layers (Android / browser) --------
+   Sheets and province focus are pushed as history layers, so the
+   device back button closes the topmost layer instead of leaving
+   the app mid-task. UI-initiated closes consume their own layer
+   (and swallow the popstate they cause); a hardware/browser back
+   arrives as a bare popstate and closes whatever is on top. */
+var uiStack = [], ignorePops = 0;
+function layerPush(kind) {
+  uiStack.push(kind);
+  try { history.pushState({ mq: uiStack.length }, ''); } catch (e) { /* ignore */ }
+}
+function layerPopUI(kind) {
+  var i = uiStack.lastIndexOf(kind);
+  if (i < 0) return;
+  uiStack.splice(i, 1);
+  ignorePops++;
+  try { history.back(); } catch (e) { /* ignore */ }
+}
+window.addEventListener('popstate', function () {
+  if (ignorePops > 0) { ignorePops--; return; }
+  var kind = uiStack.pop();
+  if (kind === 'sheet') closeSheets(true);
+  else if (kind === 'focus') exitFocus(true);
+});
+
 function openSheet(id) {
+  var wasOpen = anySheetOpen();
   SHEETS.forEach(function (s) { $(s).hidden = s !== id; });
   $('backdrop').hidden = false;
+  if (!wasOpen) layerPush('sheet');
+  /* Keyboard: land focus on the window's close button so Esc and
+     Tab start from inside the sheet, not behind it. */
+  var x = $(id).querySelector('.win-x');
+  if (x) setTimeout(function () { x.focus(); }, 40);
 }
-function closeSheets() {
+function closeSheets(fromPop) {
   SHEETS.forEach(function (s) { $(s).hidden = true; });
   $('backdrop').hidden = true;
   clearTempCamp();
+  if (!fromPop) layerPopUI('sheet');
 }
-$('backdrop').addEventListener('click', closeSheets);
+$('backdrop').addEventListener('click', function () { closeSheets(); });
 document.querySelectorAll('[data-close]').forEach(function (b) {
-  b.addEventListener('click', closeSheets);
+  b.addEventListener('click', function () { closeSheets(); });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && anySheetOpen()) closeSheets();
 });
 
 /* ---------------- HUD ---------------- */
@@ -1159,6 +1281,13 @@ function renderHUD() {
   if (PARKS_BONUS.length) {
     chips += '<span class="side-chip bonus">⭐ Bonus ' + bonusCleared() +
       '/' + PARKS_BONUS.length + '</span>';
+  }
+  /* While the seeded demo stamps are still in place, say so right
+     on the HUD — a first-time player must never mistake the four
+     sample visits for their own record. */
+  if (state.samplesActive) {
+    chips += '<span class="side-chip sample">📝 Sample stamps — demo data, ' +
+      'reset in Setup to start yours</span>';
   }
   chips += '<span class="side-chip camp">⛺ My Spots ' + state.camps.length + '</span>';
   $('hudChips').innerHTML = chips;
@@ -1279,7 +1408,9 @@ function openPark(park) {
   if (visit) {
     $('pkOpen').hidden = true;
     $('pkDone').hidden = false;
-    $('pkDate').textContent = '✅ Cleared — visited ' + fmtDate(visit.date);
+    $('pkDate').textContent = '✅ Cleared — visited ' + fmtDate(visit.date) +
+      ((state.samplesActive && SAMPLE_VISITS[park.id])
+        ? ' · 📝 sample stamp (demo)' : '');
     var img = $('pkPhoto');
     if (visit.photo) { img.src = visit.photo; img.hidden = false; }
     else img.hidden = true;
@@ -1294,6 +1425,7 @@ $('pkWentBtn').addEventListener('click', function () {
   $('pkOpen').hidden = true;
   $('visitForm').hidden = false;
   $('vDate').value = todayStr();
+  $('vDate').max = todayStr();   /* a visit can't be dated in the future */
   pendingPhoto = undefined;
 });
 $('visitCancelBtn').addEventListener('click', function () {
@@ -1302,22 +1434,39 @@ $('visitCancelBtn').addEventListener('click', function () {
   pendingPhoto = undefined;
 });
 $('vPhoto').addEventListener('change', function () {
-  var f = this.files && this.files[0];
+  var input = this;
+  var f = input.files && input.files[0];
   if (!f) { pendingPhoto = undefined; $('vPreview').hidden = true; return; }
   fileToDataURL(f, function (url) {
     pendingPhoto = url;
     if (url) { $('vPreview').src = url; $('vPreview').hidden = false; }
+    else {
+      /* Never fail silently: the stamp would save without a photo
+         and the user wouldn't know why. */
+      $('vPreview').hidden = true;
+      input.value = '';
+      alert('That photo could not be read — try another image.');
+    }
   });
 });
 $('visitForm').addEventListener('submit', function (e) {
   e.preventDefault();
   if (!currentPark) return;
+  if ($('vDate').value && $('vDate').value > todayStr()) {
+    alert('That date is in the future — pick the day you actually went.');
+    return;
+  }
   var before = levelFor(mainCleared());
-  state.visits[currentPark.id] = {
+  var pid = currentPark.id;
+  state.visits[pid] = {
     date: $('vDate').value || todayStr(),
     photo: pendingPhoto || null
   };
-  var stored = saveStateChecked();
+  state.samplesActive = false;
+  /* If storage is full, drop ONLY this visit's new photo. */
+  var stored = saveStateChecked(function () {
+    if (state.visits[pid]) state.visits[pid].photo = null;
+  });
   var after = levelFor(mainCleared());
   closeSheets();
   renderAll();
@@ -1334,8 +1483,16 @@ $('pkPhotoInput').addEventListener('change', function () {
   if (!f || !currentPark) return;
   fileToDataURL(f, function (url) {
     if (!url) { alert('That photo could not be read — try another one.'); return; }
-    state.visits[currentPark.id].photo = url;
-    if (saveStateChecked()) { openPark(currentPark); renderAll(); }
+    var visit = state.visits[currentPark.id];
+    if (!visit) return;
+    var oldPhoto = visit.photo;
+    visit.photo = url;
+    state.samplesActive = false;
+    /* If the new photo doesn't fit, the OLD photo is restored —
+       a failed swap must never cost the photo that was there. */
+    saveStateChecked(function () { visit.photo = oldPhoto; });
+    openPark(currentPark);
+    renderAll();
   });
   this.value = '';
 });
@@ -1343,27 +1500,33 @@ $('pkRemoveBtn').addEventListener('click', function () {
   if (!currentPark) return;
   if (!confirm('Remove this visit? The stamp and photo will be deleted.')) return;
   delete state.visits[currentPark.id];
+  state.samplesActive = false;
   saveState();
   closeSheets();
   renderAll();
 });
-/* localStorage can fill up with photos: if a save fails, keep the stamp
-   but drop the photo and tell the user why (Supabase Storage fixes this). */
-function saveStateChecked() {
+/* localStorage can fill up with photos. If a save fails, ONLY the
+   photo that was just added is dropped — the caller passes a
+   rollback that removes (or restores) exactly that one photo.
+   Earlier visits and photos are NEVER touched: losing a whole
+   album because one new photo didn't fit would be unforgivable.
+   (Moving photos to Supabase Storage removes the limit for good.) */
+function saveStateChecked(dropNewPhoto) {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify(
-      { visits: state.visits, camps: state.camps, seeded: true }));
+    localStorage.setItem(LS_KEY, JSON.stringify(statePayload()));
     return true;
   } catch (e) {
-    Object.keys(state.visits).forEach(function (k) { state.visits[k].photo = null; });
-    state.camps.forEach(function (c) { c.photo = null; });
+    if (dropNewPhoto) dropNewPhoto();
     try {
-      localStorage.setItem(LS_KEY, JSON.stringify(
-        { visits: state.visits, camps: state.camps, seeded: true }));
-      alert('Storage is full, so visits were saved without photos this time.');
+      localStorage.setItem(LS_KEY, JSON.stringify(statePayload()));
+      alert('⚠️ Storage is full — your stamp was saved, but that photo ' +
+        'could not fit. All your earlier photos are safe. ' +
+        'Tip: export a backup in Setup (💾 Your data).');
       return true;
     } catch (e2) {
-      alert('Storage is full — the visit is kept for this session only.');
+      alert('⚠️ Storage is full — this is kept for this session only ' +
+        'and will be lost when you close the tab. Please export a ' +
+        'backup from Setup (💾 Your data) as soon as you can.');
       return false;
     }
   }
@@ -1378,6 +1541,7 @@ function openCampForm() {
   $('campView').hidden = true;
   $('cName').value = '';
   $('cDate').value = todayStr();
+  $('cDate').max = todayStr();   /* a camp night can't be in the future */
   $('cPhoto').value = '';
   $('cPreview').hidden = true;
   openSheet('campSheet');
@@ -1397,24 +1561,36 @@ $('campCancelBtn').addEventListener('click', function () {
   closeSheets();
 });
 $('cPhoto').addEventListener('change', function () {
-  var f = this.files && this.files[0];
+  var input = this;
+  var f = input.files && input.files[0];
   if (!f) { campPhotoData = undefined; $('cPreview').hidden = true; return; }
   fileToDataURL(f, function (url) {
     campPhotoData = url;
     if (url) { $('cPreview').src = url; $('cPreview').hidden = false; }
+    else {
+      $('cPreview').hidden = true;
+      input.value = '';
+      alert('That photo could not be read — try another image.');
+    }
   });
 });
 $('campForm').addEventListener('submit', function (e) {
   e.preventDefault();
   if (!pendingCamp) { closeSheets(); return; }
-  state.camps.push({
+  if ($('cDate').value && $('cDate').value > todayStr()) {
+    alert('That date is in the future — pick the day you actually camped.');
+    return;
+  }
+  var camp = {
     id: 'camp-' + Date.now(),
     name: $('cName').value.trim() || 'My campsite',
     lat: pendingCamp.lat, lng: pendingCamp.lng,
     date: $('cDate').value || todayStr(),
     photo: campPhotoData || null
-  });
-  saveStateChecked();
+  };
+  state.camps.push(camp);
+  /* If storage is full, drop ONLY this new campsite's photo. */
+  saveStateChecked(function () { camp.photo = null; });
   clearTempCamp();
   closeSheets();
   renderAll();
@@ -1431,12 +1607,14 @@ $('campDeleteBtn').addEventListener('click', function () {
 /* ---------------- Quest journal ---------------- */
 function questRow(park) {
   var visit = state.visits[park.id];
+  var sample = !!(visit && state.samplesActive && SAMPLE_VISITS[park.id]);
   return '<button type="button" class="quest-row' + (visit ? '' : ' open') +
     '" data-park="' + park.id + '">' +
     '<span class="q-ico">' + (visit ? '🏕' : '❔') + '</span>' +
     '<span class="q-name">' + esc(park.name) +
     '<small>' + esc(KIND_LABEL[park.kind]) + (visit ? ' · ' + fmtDate(visit.date) : '') + '</small></span>' +
-    '<span class="q-badge' + (visit ? '' : ' todo') + '">' + (visit ? 'CLEAR' : 'OPEN') + '</span></button>';
+    '<span class="q-badge' + (visit ? '' : ' todo') + '">' +
+    (visit ? (sample ? '📝 SAMPLE' : 'CLEAR') : 'OPEN') + '</span></button>';
 }
 function renderJournal() {
   var n = mainCleared();
@@ -1488,7 +1666,10 @@ function renderJournal() {
       closeSheets();
       if (park.province !== focusCode) focusProvince(park.province);
       focusLatLng(park.lat, park.lng, Math.min(view.w, FULL.w / 5));
-      setTimeout(function () { openPark(park); }, 350);
+      /* Wait for the 600ms camera flight to land before opening
+         the card — at 350ms the sheet used to cover a still-moving
+         map and the marker wasn't centred yet. */
+      setTimeout(function () { openPark(park); }, 680);
     });
   });
   document.querySelectorAll('[data-camp]').forEach(function (row) {
@@ -1499,7 +1680,7 @@ function renderJournal() {
       if (!camp) return;
       closeSheets();
       focusLatLng(camp.lat, camp.lng, FULL.w / 6);
-      setTimeout(function () { openCampView(camp); }, 350);
+      setTimeout(function () { openCampView(camp); }, 680);
     });
   });
 }
@@ -1507,6 +1688,7 @@ document.querySelectorAll('.tab').forEach(function (tab) {
   tab.addEventListener('click', function () {
     document.querySelectorAll('.tab').forEach(function (t) {
       t.classList.toggle('active', t === tab);
+      t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
     });
     var which = tab.getAttribute('data-tab');
     $('tabMain').hidden = which !== 'main';
@@ -1548,11 +1730,17 @@ function renderPosterSvg() {
 }
 function savePosterPng() {
   if (!GEO || !posterSvg) { alert('The map is still loading — try again in a moment.'); return; }
+  /* Print scale: the whole poster is laid out at 2x the original
+     CSS-size geometry, so the PNG comes out at 3520px wide —
+     ~300dpi across an A4/Letter print — instead of the old
+     1760px, which pixelated the moment anyone actually printed
+     their map. Every constant below is multiplied by PS. */
+  var PS = 2;
   var n = mainCleared();
   var clone = posterSvg.cloneNode(true);
   clone.setAttribute('xmlns', SVGNS);
   clone.setAttribute('xmlns:xlink', XLINK_NS);
-  var drawW = 1500;
+  var drawW = 1500 * PS;
   var drawH = Math.round(drawW * FULL.h / FULL.w);
   clone.setAttribute('width', drawW);
   clone.setAttribute('height', drawH);
@@ -1566,36 +1754,36 @@ function savePosterPng() {
     var roundFont = '"Arial Rounded MT Bold","Hiragino Maru Gothic ProN",ui-rounded,system-ui,sans-serif';
     var pxFont = '"Press Start 2P",ui-monospace,monospace';
     var meas = document.createElement('canvas').getContext('2d');
-    meas.font = '400 25px ' + roundFont;
+    meas.font = '400 ' + (25 * PS) + 'px ' + roundFont;
     var lines = [], line = '';
     names.forEach(function (nm) {
       var test = line ? line + '  ·  ' + nm : nm;
-      if (meas.measureText(test).width > 1560 && line) { lines.push(line); line = nm; }
+      if (meas.measureText(test).width > 1560 * PS && line) { lines.push(line); line = nm; }
       else line = test;
     });
     if (line) lines.push(line);
     if (!lines.length) lines = ['No stamps yet — every quest starts with a single park.'];
-    var cw = 1760, ch = 1330 + lines.length * 38 + 120;
+    var cw = 1760 * PS, ch = (1330 + lines.length * 38 + 120) * PS;
     var canvas = document.createElement('canvas');
     canvas.width = cw; canvas.height = ch;
     var ctx = canvas.getContext('2d');
     ctx.fillStyle = '#fffaf0';
     ctx.fillRect(0, 0, cw, ch);
-    ctx.strokeStyle = '#5b3a1e'; ctx.lineWidth = 12;
-    ctx.strokeRect(18, 18, cw - 36, ch - 36);
-    ctx.strokeStyle = '#c98d4e'; ctx.lineWidth = 4;
-    ctx.strokeRect(42, 42, cw - 84, ch - 84);
+    ctx.strokeStyle = '#5b3a1e'; ctx.lineWidth = 12 * PS;
+    ctx.strokeRect(18 * PS, 18 * PS, cw - 36 * PS, ch - 36 * PS);
+    ctx.strokeStyle = '#c98d4e'; ctx.lineWidth = 4 * PS;
+    ctx.strokeRect(42 * PS, 42 * PS, cw - 84 * PS, ch - 84 * PS);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#b4552d';
-    ctx.font = '28px ' + pxFont;
-    ctx.fillText('CANADA PARKS QUEST', cw / 2, 118);
+    ctx.font = (28 * PS) + 'px ' + pxFont;
+    ctx.fillText('CANADA PARKS QUEST', cw / 2, 118 * PS);
     ctx.fillStyle = '#4a3f35';
-    ctx.font = '800 58px ' + roundFont;
-    ctx.fillText('Every park, one stamp at a time', cw / 2, 196);
+    ctx.font = '800 ' + (58 * PS) + 'px ' + roundFont;
+    ctx.fillText('Every park, one stamp at a time', cw / 2, 196 * PS);
     ctx.fillStyle = '#d94f4f';
-    ctx.font = '52px ' + pxFont;
-    ctx.fillText(n + ' / 48', cw / 2, 282);
-    var boxW = 1620, boxH = 860, boxY = 320;
+    ctx.font = (52 * PS) + 'px ' + pxFont;
+    ctx.fillText(n + ' / 48', cw / 2, 282 * PS);
+    var boxW = 1620 * PS, boxH = 860 * PS, boxY = 320 * PS;
     var scale = Math.min(boxW / drawW, boxH / drawH);
     var dw = drawW * scale, dh = drawH * scale;
     ctx.drawImage(img, (cw - dw) / 2, boxY + (boxH - dh) / 2, dw, dh);
@@ -1605,16 +1793,16 @@ function savePosterPng() {
     }).join('    ');
     small += '     ⭐ Bonus ' + bonusCleared() + '/' + PARKS_BONUS.length;
     ctx.fillStyle = '#4a3f35';
-    ctx.font = '800 34px ' + roundFont;
+    ctx.font = '800 ' + (34 * PS) + 'px ' + roundFont;
     ctx.fillText('Explorer Lv.' + levelFor(n) + '     ' + small +
-      '     ⛺ My Spots ' + state.camps.length, cw / 2, 1252);
+      '     ⛺ My Spots ' + state.camps.length, cw / 2, 1252 * PS);
     ctx.fillStyle = '#4a3f35';
-    ctx.font = '400 25px ' + roundFont;
-    lines.forEach(function (ln, i) { ctx.fillText(ln, cw / 2, 1310 + i * 38); });
+    ctx.font = '400 ' + (25 * PS) + 'px ' + roundFont;
+    lines.forEach(function (ln, i) { ctx.fillText(ln, cw / 2, (1310 + i * 38) * PS); });
     ctx.fillStyle = '#a08b74';
-    ctx.font = '400 25px ' + roundFont;
+    ctx.font = '400 ' + (25 * PS) + 'px ' + roundFont;
     ctx.fillText('🏕️ Made with our own two feet — from coast to coast to coast.',
-      cw / 2, 1310 + lines.length * 38 + 44);
+      cw / 2, (1310 + lines.length * 38 + 44) * PS);
     if (canvas.toBlob) {
       canvas.toBlob(function (blob) {
         var a = document.createElement('a');
@@ -1642,30 +1830,81 @@ function renderAll() {
   renderHUD();
   renderJournal();
   renderMap();
-  renderPoster();
+  /* The poster is NOT re-rendered here: it used to rebuild its
+     whole SVG (markers + every photo fill) on every stamp, photo
+     swap and reset, even though the poster sheet was closed.
+     posterBtn renders it fresh right before the sheet opens. */
 }
 $('mapBtn').addEventListener('click', function () { closeSheets(); exitFocus(); });
 $('journalBtn').addEventListener('click', function () { renderJournal(); openSheet('journalSheet'); });
 $('posterBtn').addEventListener('click', function () { renderPoster(); openSheet('posterSheet'); });
 $('settingsBtn').addEventListener('click', function () { openSheet('settingsSheet'); });
 $('posterPngBtn').addEventListener('click', savePosterPng);
-$('backBtn').addEventListener('click', exitFocus);
+$('backBtn').addEventListener('click', function () { exitFocus(); });
 $('zoomIn').addEventListener('click', function () {
   zoomAt({ x: view.cx, y: view.cy }, 0.62);
 });
 $('zoomOut').addEventListener('click', function () {
   zoomAt({ x: view.cx, y: view.cy }, 1.6);
 });
-$('zoomReset').addEventListener('click', exitFocus);
+$('zoomReset').addEventListener('click', function () { exitFocus(); });
 $('leafToggle').addEventListener('change', function () {
   settings.leaves = $('leafToggle').checked;
   saveSettings();
   applyLeaves();
 });
+/* ---------------- Backup: export / import ----------------
+   The whole quest lives in one localStorage key; this pair of
+   buttons is the only way it survives a cleared browser or a
+   new phone. The file is plain JSON: visits + camps, verbatim. */
+$('exportBtn').addEventListener('click', function () {
+  var payload = {
+    app: 'maplepins-quest', version: 1,
+    exportedAt: new Date().toISOString(),
+    visits: state.visits, camps: state.camps
+  };
+  var blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.download = 'maplepins-backup-' + todayStr() + '.json';
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+});
+$('importBtn').addEventListener('click', function () { $('importFile').click(); });
+$('importFile').addEventListener('change', function () {
+  var f = this.files && this.files[0];
+  this.value = '';
+  if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function () {
+    var d = null;
+    try { d = JSON.parse(rd.result); } catch (e) { /* handled below */ }
+    if (!d || typeof d.visits !== 'object' || d.visits === null ||
+        Array.isArray(d.visits) || !Array.isArray(d.camps)) {
+      alert('That file is not a MaplePins backup.');
+      return;
+    }
+    /* Light shape check: drop any entry that isn't a record. */
+    Object.keys(d.visits).forEach(function (k) {
+      if (!d.visits[k] || typeof d.visits[k] !== 'object') delete d.visits[k];
+    });
+    if (!confirm('Replace ALL your current visits and campsites with this backup?')) return;
+    state.visits = d.visits;
+    state.camps = d.camps;
+    state.samplesActive = false;
+    saveState();
+    closeSheets();
+    renderAll();
+    alert('Backup restored — welcome back, explorer! 🏕');
+  };
+  rd.onerror = function () { alert('That file could not be read.'); };
+  rd.readAsText(f);
+});
 $('resetBtn').addEventListener('click', function () {
   if (!confirm('Reset the whole quest? All visits, photos and campsites on this device will be cleared.')) return;
   state.visits = {};
   state.camps = [];
+  state.samplesActive = false;
   saveState();
   closeSheets();
   renderAll();
@@ -1674,7 +1913,19 @@ $('resetBtn').addEventListener('click', function () {
 window.addEventListener('resize', function () { if (FULL) applyView(); });
 
 /* ---------------- Init ---------------- */
+var geoFailed = false;
+$('tapHint').addEventListener('click', function () {
+  if (geoFailed) location.reload();   /* the hint pill becomes the retry */
+});
 (async function init() {
+  /* Offline shell: after the first visit, the app (and the map
+     data) opens with no signal — trailhead-proof. */
+  if ('serviceWorker' in navigator) {
+    try {
+      var swp = navigator.serviceWorker.register('sw.js');
+      if (swp && swp.catch) swp.catch(function () { /* not critical */ });
+    } catch (e) { /* ignore */ }
+  }
   loadState();
   loadSettings();
   $('leafToggle').checked = settings.leaves;
@@ -1682,7 +1933,9 @@ window.addEventListener('resize', function () { if (FULL) applyView(); });
   try {
     await loadGeo();
   } catch (e) {
-    $('tapHint').textContent = 'The map could not load — check your connection and refresh.';
+    geoFailed = true;
+    $('tapHint').textContent = '⚠️ The map could not load — tap here to retry.';
+    $('tapHint').style.cursor = 'pointer';
     return;
   }
   buildCells();

@@ -7,6 +7,12 @@
 <meta name="description" content="A stamp-rally game across Canada's 48 national parks & reserves. Visit a park, stamp it with your photo, level up, fill the map.">
 <meta name="theme-color" content="#7a4a21">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏕️</text></svg>">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="MaplePins">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -161,9 +167,9 @@
     <button class="sheet-close win-x" type="button" data-close aria-label="Close">✕</button></div>
   <div class="win-body">
     <div class="tabs" role="tablist">
-      <button class="tab active" type="button" data-tab="main">📜 Main</button>
-      <button class="tab" type="button" data-tab="side">🧭 Side</button>
-      <button class="tab" type="button" data-tab="spots">⛺ My Spots</button>
+      <button class="tab active" type="button" role="tab" aria-selected="true" data-tab="main">📜 Main</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="side">🧭 Side</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="spots">⛺ My Spots</button>
     </div>
 
     <div class="tab-panel" id="tabMain">
@@ -221,6 +227,11 @@
       <span>Falling maple leaves 🍁<small>Leaves drift over the map, and clearing a park bursts them into the air.</small></span>
       <label class="switch"><input type="checkbox" id="leafToggle" checked><span class="slider"></span></label>
     </div>
+    <h3 class="sheet-sub">Your data 💾</h3>
+    <p class="hint">Your quest lives only in this browser — if its data is cleared, or you switch phones, it's gone. Export a backup file now and then, and import it on the new device to pick up right where you left off.</p>
+    <button id="exportBtn" class="gbtn-wide" type="button">⬇️ Export backup (.json)</button>
+    <button id="importBtn" class="gbtn-wide ghost" type="button">⬆️ Import backup</button>
+    <input id="importFile" type="file" accept="application/json,.json" hidden>
     <h3 class="sheet-sub">About this quest</h3>
     <p class="hint">Main quest: the 48 places of the Parks Canada system — 37 national parks and 11 national park reserves. Bonus: Rouge, Canada's only National Urban Park, sits outside the 48 and never counts toward your level. Side quests: curated provincial parks — Ontario set included. Demo data lives only in this browser (localStorage).</p>
     <h3 class="sheet-sub">Start over</h3>
