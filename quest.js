@@ -1329,9 +1329,11 @@ function saveSettings() {
   catch (e) { /* ignore */ }
 }
 var LEAF_COLORS = ['#d94f4f', '#e2543e', '#e8862e', '#f09a3e', '#f2c230', '#c93b3b'];
-var LEAF_PATH = 'M50 1 L57 14 L66 7 L65 21 L79 13 L77 28 L92 30 L83 42 ' +
-  'L91 56 L75 54 L66 72 L53 74 L53 96 L47 96 L47 74 L34 72 L25 54 L9 56 ' +
-  'L17 42 L8 30 L23 28 L21 13 L35 21 L34 7 L43 14 Z';
+var LEAF_PATH = 'M49.4 1 L40.5 16.6 L34 15.3 L33.9 35.6 L21 25.6 L3.5 24.1 ' +
+  'L8.5 42.8 L2.8 46.8 L16.7 59.8 L2.2 69.9 L17.4 77.6 L29.3 77.1 L29.7 86.2 ' +
+  'L48.4 71.6 L48.4 98 L52 98 L52 71.4 L70.5 85.4 L70 76.8 L82.6 76.7 ' +
+  'L97.8 67.4 L82.2 59.1 L96.3 46.4 L90.8 42.3 L96.2 23.6 L79 25.6 L66 35 ' +
+  'L65.6 14.7 L59.1 15.3 Z';
 function leafSvg(color, size) {
   return '<svg viewBox="0 0 100 100" width="' + size + '" height="' + size +
     '" aria-hidden="true"><path d="' + LEAF_PATH + '" fill="' + color + '"/></svg>';
