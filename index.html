@@ -79,6 +79,22 @@
       <div class="lvl-body" id="lvlBody">Explorer Lv.2</div>
     </div>
   </div>
+
+  <!-- First-run welcome: the whole game in three steps. Shown once
+       per device; Setup ▸ How to play brings it back. -->
+  <div id="welcomeFx" class="welcome-fx" hidden>
+    <div class="welcome-window win">
+      <div class="welcome-title">🍁 Welcome to MaplePins!</div>
+      <p class="welcome-sub">A stamp quest across Canada's 48 national parks &amp; reserves.</p>
+      <ol class="welcome-steps">
+        <li><span class="w-ico">🗺️</span><span><b>Tap a province</b>, then tap a park marker.</span></li>
+        <li><span class="w-ico">📸</span><span><b>Been there?</b> Stamp it with the date and your photo.</span></li>
+        <li><span class="w-ico">🎨</span><span><b>Your photo fills the map.</b> Fill all 48 parks to complete your Canada poster!</span></li>
+      </ol>
+      <p class="welcome-note">Four sample stamps are already on the map so you can see how it looks — you can clear them anytime in Setup.</p>
+      <button id="welcomeStartBtn" class="gbtn-wide primary" type="button">Start exploring →</button>
+    </div>
+  </div>
 </main>
 
 <!-- ======================= Sheets (game windows) ======================= -->
@@ -222,6 +238,8 @@
     <button class="sheet-close win-x" type="button" data-close aria-label="Close">✕</button></div>
   <div class="win-body">
     <h2 class="setup-h">Settings ⚙️</h2>
+    <h3 class="sheet-sub">How to play</h3>
+    <button id="howToBtn" class="gbtn-wide ghost" type="button">❓ Show the welcome guide</button>
     <h3 class="sheet-sub">Ambience</h3>
     <div class="toggle-row">
       <span>Falling maple leaves 🍁<small>Leaves drift over the map, and clearing a park bursts them into the air.</small></span>

@@ -378,10 +378,33 @@ body{
 .park-marker:focus .mk-open,.park-marker:focus .mk-open-side,
 .park-marker:focus .mk-open-bonus,.park-marker:focus .mk-done,
 .park-marker:focus .mk-done-side,.park-marker:focus .mk-done-bonus,
-.park-marker:focus .mk-photo,.camp-marker:focus .mk-camp,
-.camp-marker:focus .mk-photo{
+.park-marker:focus .mk-photo,.park-marker:focus .mk-photo-side,
+.camp-marker:focus .mk-camp,.camp-marker:focus .mk-photo{
   stroke:var(--sky-d);
 }
+
+/* First-run welcome: a dimmed, centred game window — same family
+   as the level-up window, but it waits for a tap instead of
+   fading away on a timer. */
+.welcome-fx{
+  position:absolute;inset:0;display:grid;place-items:center;z-index:32;
+  background:rgba(43,28,12,.48);padding:1rem;
+}
+.welcome-fx[hidden]{display:none}
+.welcome-window{
+  max-width:350px;width:100%;padding:1.15rem 1.25rem 1.25rem;
+  animation:winIn .28s ease both;
+}
+@keyframes winIn{
+  from{transform:scale(.92);opacity:0}
+  to{transform:scale(1);opacity:1}
+}
+.welcome-title{font-family:var(--pxfont);font-size:.82rem;color:#8c6a10;line-height:1.5}
+.welcome-sub{margin-top:.55rem;font-weight:700;color:var(--ink2)}
+.welcome-steps{list-style:none;margin:.9rem 0 .4rem;padding:0;display:grid;gap:.6rem}
+.welcome-steps li{display:flex;gap:.6rem;align-items:flex-start;line-height:1.35}
+.welcome-steps .w-ico{font-size:1.15rem;line-height:1.2}
+.welcome-note{font-size:.85rem;color:var(--ink2);margin:.5rem 0 .9rem;line-height:1.4}
 
 @media (prefers-reduced-motion: reduce){
   #leafLayer{display:none}

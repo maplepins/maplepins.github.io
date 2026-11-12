@@ -212,24 +212,41 @@ function fmtDate(iso) {
    (Demo storage: localStorage. Production: upload the blob to
    Supabase Storage and store only the returned URL.) */
 function fileToDataURL(file, cb) {
+  function finish(img, w0, h0) {
+    /* Cap the LONGEST side at 800px (the old width-only cap let
+       tall phone screenshots balloon into huge data URLs). */
+    var scale = Math.min(1, 800 / Math.max(w0, h0));
+    var w = Math.max(1, Math.round(w0 * scale));
+    var h = Math.max(1, Math.round(h0 * scale));
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(img, 0, 0, w, h);
+    cb(c.toDataURL('image/jpeg', 0.82));
+  }
   var rd = new FileReader();
   rd.onload = function () {
     var img = new Image();
-    img.onload = function () {
-      var scale = Math.min(1, 800 / img.width);
-      var w = Math.max(1, Math.round(img.width * scale));
-      var h = Math.max(1, Math.round(img.height * scale));
-      var c = document.createElement('canvas');
-      c.width = w; c.height = h;
-      c.getContext('2d').drawImage(img, 0, 0, w, h);
-      cb(c.toDataURL('image/jpeg', 0.82));
+    img.onload = function () { finish(img, img.width, img.height); };
+    img.onerror = function () {
+      /* Some phone photos (HEIC "high efficiency" shots) cannot be
+         decoded from a data URL by this browser. createImageBitmap
+         goes through the OS decoder instead, which often can —
+         give the photo one more chance before giving up. */
+      if (!window.createImageBitmap) { cb(null); return; }
+      var p;
+      try { p = createImageBitmap(file, { imageOrientation: 'from-image' }); }
+      catch (e) { p = createImageBitmap(file); }
+      p.then(function (bmp) { finish(bmp, bmp.width, bmp.height); },
+             function () { cb(null); });
     };
-    img.onerror = function () { cb(null); };
     img.src = rd.result;
   };
   rd.onerror = function () { cb(null); };
   rd.readAsDataURL(file);
 }
+var PHOTO_READ_FAIL_MSG = 'That photo could not be read. If it is a ' +
+  'HEIC (high-efficiency) photo, this browser cannot open it — ' +
+  'try a JPEG or PNG instead.';
 
 /* ---------------- Illustrated map (same recipe as app.js) ---------------- */
 var SVGNS = 'http://www.w3.org/2000/svg';
@@ -883,7 +900,14 @@ function renderMarkersInto(parts, interactive, viewW) {
     var visit = state.visits[park.id];
     var bonus = park.tier === 'bonus';
     var g;
-    if (visit) {
+    if (it.side && visit && visit.photo) {
+      /* Side quests own no map cell, so a cleared side park shows
+         its photo as a round thumbnail marker (same treatment as
+         campsites). Without this the photo existed only inside
+         the quest card, and stamping a side park looked exactly
+         like the photo never uploaded. */
+      g = photoMarker(it.x, it.y, it.s * 1.15, visit.photo, 'mk-photo-side');
+    } else if (visit) {
       g = circleMarker(it.x, it.y, it.s,
         it.side ? 'mk-done-side' : (bonus ? 'mk-done-bonus' : 'mk-done'), '★', 1.0);
     } else {
@@ -1447,7 +1471,7 @@ $('vPhoto').addEventListener('change', function () {
          and the user wouldn't know why. */
       $('vPreview').hidden = true;
       input.value = '';
-      alert('That photo could not be read — try another image.');
+      alert(PHOTO_READ_FAIL_MSG);
     }
   });
 });
@@ -1484,7 +1508,7 @@ $('pkPhotoInput').addEventListener('change', function () {
   var f = this.files && this.files[0];
   if (!f || !currentPark) return;
   fileToDataURL(f, function (url) {
-    if (!url) { alert('That photo could not be read — try another one.'); return; }
+    if (!url) { alert(PHOTO_READ_FAIL_MSG); return; }
     var visit = state.visits[currentPark.id];
     if (!visit) return;
     var oldPhoto = visit.photo;
@@ -1572,7 +1596,7 @@ $('cPhoto').addEventListener('change', function () {
     else {
       $('cPreview').hidden = true;
       input.value = '';
-      alert('That photo could not be read — try another image.');
+      alert(PHOTO_READ_FAIL_MSG);
     }
   });
 });
@@ -1914,6 +1938,28 @@ $('resetBtn').addEventListener('click', function () {
 });
 window.addEventListener('resize', function () { if (FULL) applyView(); });
 
+/* ---------------- First-run welcome ----------------
+   One card that teaches the whole game in three steps. A tester
+   who had never seen the app opened it cold and could not tell
+   what to do — the map alone doesn't explain itself. Shown once
+   per device (flag below); Setup ▸ How to play reopens it. */
+var WELCOME_KEY = 'maplepins_quest_welcomed_v1';
+function showWelcome() { $('welcomeFx').hidden = false; }
+function hideWelcome() {
+  $('welcomeFx').hidden = true;
+  try { localStorage.setItem(WELCOME_KEY, '1'); } catch (e) { /* ignore */ }
+}
+$('welcomeStartBtn').addEventListener('click', hideWelcome);
+$('howToBtn').addEventListener('click', function () {
+  closeSheets();
+  showWelcome();
+});
+function maybeShowWelcome() {
+  var seen = false;
+  try { seen = !!localStorage.getItem(WELCOME_KEY); } catch (e) { /* ignore */ }
+  if (!seen) showWelcome();
+}
+
 /* ---------------- Init ---------------- */
 var geoFailed = false;
 $('tapHint').addEventListener('click', function () {
@@ -1952,6 +1998,7 @@ $('tapHint').addEventListener('click', function () {
   fitView();
   refreshFocusUI();
   renderAll();
+  maybeShowWelcome();
 })();
 
 })();
