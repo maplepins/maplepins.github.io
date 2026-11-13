@@ -43,7 +43,8 @@ body{
    static halo baked into its path attributes. */
 @keyframes glowPulse{from{opacity:.55}to{opacity:1}}
 .glow-layer{animation:glowPulse 4.5s ease-in-out infinite alternate}
-@media (prefers-reduced-motion: reduce){ .glow-layer{animation:none} }
+.rays-layer{animation:glowPulse 7s ease-in-out infinite alternate}
+@media (prefers-reduced-motion: reduce){ .glow-layer,.rays-layer{animation:none} }
 
 /* Generic pixel window (HUD bar, level-up popup) */
 .win{

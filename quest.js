@@ -384,11 +384,19 @@ function provRatio(code) {
   return done / parks.length;
 }
 function provFillOpacity(code) { return 0.55 + 0.45 * provRatio(code); }
-function provGlowOpacity(code) { return 0.55 * (1 - provRatio(code)); }
+function provGlowOpacity(code) { return 0.38 * (1 - provRatio(code)); }
+/* Light-ray layer strength (Minji, 2026-11-13: thin lines, and
+   straight shafts of light rising through the map's seams):
+   full while the map is mostly empty, easing to a whisper once
+   the photos have taken over. */
+function raysGroupOpacity() {
+  var total = PARKS_MAIN.length || 48;
+  return 1 - 0.7 * (mainCleared() / total);
+}
 function buildSvgView(svg, isMain) {
   var viewKey = isMain ? 'm' : 'p';
   var parts = { paths:{}, labels:null, markers:null, camps:null, temp:null, badges:null,
-    labelEls:{}, fillGroups:{}, outlines:{}, glow:{}, viewKey: viewKey };
+    labelEls:{}, fillGroups:{}, outlines:{}, glow:{}, rays:null, viewKey: viewKey };
   /* Clips: one per province (its outline) and one per park cell.
      Ids are prefixed per view so map and poster never collide. */
   var defs = svgEl('defs');
@@ -402,6 +410,12 @@ function buildSvgView(svg, isMain) {
     cp.appendChild(svgEl('path', { d: cellPathD(CELLS[id]) }));
     defs.appendChild(cp);
   });
+  /* Light-ray gradient: warm at the seam the rays pour from,
+     fully transparent at the top of the shaft. */
+  var rg = svgEl('linearGradient', { id: 'raysgrad-' + viewKey, x1: '0', y1: '1', x2: '0', y2: '0' });
+  rg.appendChild(svgEl('stop', { offset: '0', 'stop-color': '#ffe9b0', 'stop-opacity': '0.55' }));
+  rg.appendChild(svgEl('stop', { offset: '1', 'stop-color': '#ffe9b0', 'stop-opacity': '0' }));
+  defs.appendChild(rg);
   svg.appendChild(defs);
   var gProv = svgEl('g');
   GEO.features.forEach(function (f) {
@@ -424,15 +438,17 @@ function buildSvgView(svg, isMain) {
     gFills.appendChild(g);
   });
   svg.appendChild(gFills);
-  /* Ghost-map glow: a wide, faint golden halo traced under each
-     province outline that still has empty quests. It is a plain
-     fat stroke (no SVG filter), so it survives the poster's
-     serialization; refreshProvinceFills() fades it per province
-     as quests clear, and quest.css breathes it on the live map. */
+  /* Ghost-map glow: a thin, faint golden trace along each
+     province outline that still has empty quests (Minji,
+     2026-11-13: the first fat halo read as too thick — lines
+     stay thin and hazy now). A plain stroke (no SVG filter), so
+     it survives the poster's serialization;
+     refreshProvinceFills() fades it per province as quests
+     clear, and quest.css breathes it on the live map. */
   var gGlow = svgEl('g', { 'class': 'glow-layer' });
   GEO.features.forEach(function (f) {
     var h = svgEl('path', { d: f.d, fill: 'none', stroke: '#ffc46b',
-      'stroke-width': 1.05, 'stroke-linejoin': 'round',
+      'stroke-width': 0.30, 'stroke-linejoin': 'round',
       opacity: provGlowOpacity(f.code) });
     h.style.pointerEvents = 'none';
     parts.glow[f.code] = h;
@@ -450,6 +466,36 @@ function buildSvgView(svg, isMain) {
     gOut.appendChild(o);
   });
   svg.appendChild(gOut);
+  /* Light rays: thin straight beams pour up from the map's
+     southern seam and fade as they rise, like sun shafts coming
+     through a crack (Minji's reference, 2026-11-13). Plain
+     polygons filled with the defs gradient above — no filters,
+     so the poster keeps them. The layer fades as the map fills;
+     refreshProvinceFills() keeps its opacity current. */
+  var gRays = svgEl('g', { 'class': 'rays-layer', opacity: raysGroupOpacity() });
+  gRays.style.pointerEvents = 'none';
+  var beamAngles = [-38, -26, -15, -5, 5, 16, 27, 38];
+  var rox = FULL.x + FULL.w * 0.5, roy = FULL.y + FULL.h * 1.03;
+  var rLen = FULL.h * 1.18;
+  beamAngles.forEach(function (deg, i) {
+    var a = deg * Math.PI / 180;
+    var tx = rox + Math.sin(a) * rLen, ty = roy - Math.cos(a) * rLen;
+    var px = Math.cos(a), py = Math.sin(a);
+    var b0 = 0.22, b1 = 1.35;
+    var pts = [
+      (rox - px * b0).toFixed(2) + ',' + (roy - py * b0).toFixed(2),
+      (rox + px * b0).toFixed(2) + ',' + (roy + py * b0).toFixed(2),
+      (tx + px * b1).toFixed(2) + ',' + (ty + py * b1).toFixed(2),
+      (tx - px * b1).toFixed(2) + ',' + (ty - py * b1).toFixed(2)
+    ].join(' ');
+    gRays.appendChild(svgEl('polygon', { points: pts,
+      fill: 'url(#raysgrad-' + viewKey + ')', opacity: (i % 2 === 0) ? 0.20 : 0.12 }));
+  });
+  /* A soft pool of light where the rays pour out. */
+  gRays.appendChild(svgEl('ellipse', { cx: rox, cy: roy,
+    rx: FULL.w * 0.13, ry: FULL.h * 0.045, fill: '#ffe9b0', opacity: 0.16 }));
+  parts.rays = gRays;
+  svg.appendChild(gRays);
   /* Decorative pixel maple trees printed on the map's bottom ocean
      corners, like illustrations on an old game map. Living inside the
      SVG means they can never collide with the HUD or dock chrome. */
@@ -543,6 +589,7 @@ function refreshProvinceFills() {
         parts.glow[code].setAttribute('opacity', provGlowOpacity(code));
       }
     });
+    if (parts.rays) parts.rays.setAttribute('opacity', raysGroupOpacity());
   });
 }
 
@@ -699,19 +746,20 @@ function renderPhotoFills(parts) {
       return p.province === code && p.tier !== 'side';
     });
     /* Empty cells: no fill at all — the slot is traced by a soft
-       glowing seam (a wide faint halo under a thin bright core),
-       so the empty map reads as a ghost of itself, waiting to be
+       glowing seam (a whisper-thin halo under a thin bright
+       core — Minji, 2026-11-13: lines thin and hazy), so the
+       empty map reads as a ghost of itself, waiting to be
        filled. Never a card floating on the map. */
     parks.forEach(function (park) {
       var cell = CELLS[park.id];
       if (!cell) return;
       g.appendChild(svgEl('path', { d: cellPathD(cell),
         fill: 'none',
-        stroke: 'rgba(255,196,107,0.32)', 'stroke-width': 0.30,
+        stroke: 'rgba(255,196,107,0.20)', 'stroke-width': 0.13,
         'stroke-linejoin': 'round' }));
       g.appendChild(svgEl('path', { d: cellPathD(cell),
         fill: 'none',
-        stroke: 'rgba(255,246,214,0.80)', 'stroke-width': 0.055,
+        stroke: 'rgba(255,246,214,0.62)', 'stroke-width': 0.05,
         'stroke-linejoin': 'round' }));
     });
     /* Filled cells: the photo, cover-fit over the cell's bbox and
