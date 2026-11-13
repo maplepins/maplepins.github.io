@@ -391,7 +391,7 @@ function provGlowOpacity(code) { return 0.22 * (1 - provRatio(code)); }
    the photos have taken over. */
 function raysGroupOpacity() {
   var total = PARKS_MAIN.length || 48;
-  return 1 - 0.5 * (mainCleared() / total);
+  return 1 - 0.4 * (mainCleared() / total);
 }
 function buildSvgView(svg, isMain) {
   var viewKey = isMain ? 'm' : 'p';
@@ -413,10 +413,19 @@ function buildSvgView(svg, isMain) {
   /* Light-ray gradient: warm at the seam the rays pour from,
      fully transparent at the top of the shaft. */
   var rg = svgEl('linearGradient', { id: 'raysgrad-' + viewKey, x1: '0', y1: '1', x2: '0', y2: '0' });
-  rg.appendChild(svgEl('stop', { offset: '0', 'stop-color': '#fff3c4', 'stop-opacity': '0.9' }));
-  rg.appendChild(svgEl('stop', { offset: '0.45', 'stop-color': '#ffe9b0', 'stop-opacity': '0.34' }));
+  rg.appendChild(svgEl('stop', { offset: '0', 'stop-color': '#ffca55', 'stop-opacity': '1' }));
+  rg.appendChild(svgEl('stop', { offset: '0.35', 'stop-color': '#ffd97a', 'stop-opacity': '0.8' }));
+  rg.appendChild(svgEl('stop', { offset: '0.7', 'stop-color': '#ffe9b0', 'stop-opacity': '0.35' }));
   rg.appendChild(svgEl('stop', { offset: '1', 'stop-color': '#ffe9b0', 'stop-opacity': '0' }));
   defs.appendChild(rg);
+  /* Core gradient: near-white heart of each shaft, so the beams
+     read as solid columns of light, not a pale wash. */
+  var rc = svgEl('linearGradient', { id: 'rayscore-' + viewKey, x1: '0', y1: '1', x2: '0', y2: '0' });
+  rc.appendChild(svgEl('stop', { offset: '0', 'stop-color': '#fffdf4', 'stop-opacity': '1' }));
+  rc.appendChild(svgEl('stop', { offset: '0.4', 'stop-color': '#fff6d8', 'stop-opacity': '0.85' }));
+  rc.appendChild(svgEl('stop', { offset: '0.75', 'stop-color': '#fff3c4', 'stop-opacity': '0.3' }));
+  rc.appendChild(svgEl('stop', { offset: '1', 'stop-color': '#fff3c4', 'stop-opacity': '0' }));
+  defs.appendChild(rc);
   svg.appendChild(defs);
   var gProv = svgEl('g');
   GEO.features.forEach(function (f) {
@@ -474,42 +483,57 @@ function buildSvgView(svg, isMain) {
      refreshProvinceFills() keeps its opacity current. */
   var gRays = svgEl('g', { 'class': 'rays-layer', opacity: raysGroupOpacity() });
   gRays.style.pointerEvents = 'none';
-  /* v3 (Minji, 2026-11-13: v2's single faint fan was invisible
-     on the phone): shafts pour up from SEVEN cracks spread along
-     the southern seam, each spilling a few narrow, bright beams
-     of differing heights - the cave-photo feel. Each beam's base
-     opacity also rides in a --o custom property so quest.css can
-     shimmer the beams on staggered delays; the plain attribute
-     keeps the poster snapshot lit. */
-  var beamSrcX = [0.16, 0.28, 0.40, 0.50, 0.60, 0.72, 0.84];
-  var beamFan = [[-13, 0.95], [-4, 0.78], [6, 1.0], [14, 0.7]];
+  /* v4 (Minji, 2026-11-13: v3 still read as NO light effect on
+     the phone - the beams multiplied out to ~0.15 effective
+     opacity in a pale cream that washed out over the land fills).
+     Now: near-VERTICAL double shafts from nine cracks - a wide
+     golden outer beam plus a near-white core - with gradients
+     that stay bright along most of the shaft, bright source
+     glows at each crack, and a stronger pool at the seam. The
+     attribute opacities keep the poster snapshot lit; the --o
+     custom property lets quest.css shimmer and stretch the
+     shafts upward on the live map. */
+  var beamSrcX = [0.08, 0.18, 0.29, 0.40, 0.50, 0.60, 0.71, 0.82, 0.92];
+  var beamFan = [[-5, 0.82], [0, 1.05], [5, 0.9]];
   var roy = FULL.y + FULL.h * 1.02;
+  function beamPts(rox, a, rLen, b0, b1) {
+    var tx = rox + Math.sin(a) * rLen, ty = roy - Math.cos(a) * rLen;
+    var px = Math.cos(a), py = Math.sin(a);
+    return [
+      (rox - px * b0).toFixed(2) + ',' + (roy - py * b0).toFixed(2),
+      (rox + px * b0).toFixed(2) + ',' + (roy + py * b0).toFixed(2),
+      (tx + px * b1).toFixed(2) + ',' + (ty + py * b1).toFixed(2),
+      (tx - px * b1).toFixed(2) + ',' + (ty - py * b1).toFixed(2)
+    ].join(' ');
+  }
+  /* A pool of light along the seam the shafts pour out of. */
+  gRays.appendChild(svgEl('ellipse', { cx: FULL.x + FULL.w * 0.5, cy: roy,
+    rx: FULL.w * 0.42, ry: FULL.h * 0.055, fill: '#ffd97a', opacity: 0.38 }));
   beamSrcX.forEach(function (fx, si) {
     var rox = FULL.x + FULL.w * fx;
+    /* Bright glow right at the crack, so each source reads. */
+    gRays.appendChild(svgEl('ellipse', { cx: rox, cy: roy,
+      rx: 1.3, ry: 0.3, fill: '#fff3c4', opacity: 0.8 }));
     beamFan.forEach(function (bf, bi) {
-      if ((si + bi) % 3 === 2) return; /* vary density per crack */
+      if ((si * 2 + bi) % 4 === 3) return; /* vary density per crack */
       var a = bf[0] * Math.PI / 180;
       var rLen = FULL.h * bf[1];
-      var tx = rox + Math.sin(a) * rLen, ty = roy - Math.cos(a) * rLen;
-      var px = Math.cos(a), py = Math.sin(a);
-      var b0 = 0.15, b1 = 0.8;
-      var pts = [
-        (rox - px * b0).toFixed(2) + ',' + (roy - py * b0).toFixed(2),
-        (rox + px * b0).toFixed(2) + ',' + (roy + py * b0).toFixed(2),
-        (tx + px * b1).toFixed(2) + ',' + (ty + py * b1).toFixed(2),
-        (tx - px * b1).toFixed(2) + ',' + (ty - py * b1).toFixed(2)
-      ].join(' ');
-      var bo = 0.34 + ((si * 7 + bi * 3) % 5) * 0.07;
-      var poly = svgEl('polygon', { points: pts, 'class': 'ray',
-        fill: 'url(#raysgrad-' + viewKey + ')', opacity: bo.toFixed(2) });
-      poly.style.setProperty('--o', bo.toFixed(2));
-      poly.style.animationDelay = (-((si * 1.3 + bi * 0.9) % 5)).toFixed(1) + 's';
-      gRays.appendChild(poly);
+      var bo = 0.5 + ((si * 5 + bi * 2) % 4) * 0.06;
+      var outer = svgEl('polygon', { points: beamPts(rox, a, rLen, 0.55, 1.7),
+        'class': 'ray ray-outer', fill: 'url(#raysgrad-' + viewKey + ')',
+        opacity: bo.toFixed(2) });
+      outer.style.setProperty('--o', bo.toFixed(2));
+      outer.style.animationDelay = (-((si * 1.3 + bi * 0.9) % 5)).toFixed(1) + 's';
+      gRays.appendChild(outer);
+      var co = 0.78 + ((si * 3 + bi) % 3) * 0.07;
+      var core = svgEl('polygon', { points: beamPts(rox, a, rLen, 0.2, 0.62),
+        'class': 'ray', fill: 'url(#rayscore-' + viewKey + ')',
+        opacity: co.toFixed(2) });
+      core.style.setProperty('--o', co.toFixed(2));
+      core.style.animationDelay = (-((si * 1.1 + bi * 0.7) % 5)).toFixed(1) + 's';
+      gRays.appendChild(core);
     });
   });
-  /* A soft pool of light where the rays pour out. */
-  gRays.appendChild(svgEl('ellipse', { cx: FULL.x + FULL.w * 0.5, cy: roy,
-    rx: FULL.w * 0.34, ry: FULL.h * 0.05, fill: '#ffe9b0', opacity: 0.20 }));
   parts.rays = gRays;
   svg.appendChild(gRays);
   /* Decorative pixel maple trees printed on the map's bottom ocean
