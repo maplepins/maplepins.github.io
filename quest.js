@@ -384,15 +384,7 @@ function provRatio(code) {
   return done / parks.length;
 }
 function provFillOpacity(code) { return 0.55 + 0.45 * provRatio(code); }
-function provGlowOpacity(code) { return 0.22 * (1 - provRatio(code)); }
-/* Light-ray layer strength (Minji, 2026-11-13: thin lines, and
-   straight shafts of light rising through the map's seams):
-   full while the map is mostly empty, easing to a whisper once
-   the photos have taken over. */
-function raysGroupOpacity() {
-  var total = PARKS_MAIN.length || 48;
-  return 1 - 0.4 * (mainCleared() / total);
-}
+function provGlowOpacity(code) { return 1 - 0.75 * provRatio(code); }
 function buildSvgView(svg, isMain) {
   var viewKey = isMain ? 'm' : 'p';
   var parts = { paths:{}, labels:null, markers:null, camps:null, temp:null, badges:null,
@@ -410,22 +402,7 @@ function buildSvgView(svg, isMain) {
     cp.appendChild(svgEl('path', { d: cellPathD(CELLS[id]) }));
     defs.appendChild(cp);
   });
-  /* Light-ray gradient: warm at the seam the rays pour from,
-     fully transparent at the top of the shaft. */
-  var rg = svgEl('linearGradient', { id: 'raysgrad-' + viewKey, x1: '0', y1: '1', x2: '0', y2: '0' });
-  rg.appendChild(svgEl('stop', { offset: '0', 'stop-color': '#ffca55', 'stop-opacity': '1' }));
-  rg.appendChild(svgEl('stop', { offset: '0.35', 'stop-color': '#ffd97a', 'stop-opacity': '0.8' }));
-  rg.appendChild(svgEl('stop', { offset: '0.7', 'stop-color': '#ffe9b0', 'stop-opacity': '0.35' }));
-  rg.appendChild(svgEl('stop', { offset: '1', 'stop-color': '#ffe9b0', 'stop-opacity': '0' }));
-  defs.appendChild(rg);
-  /* Core gradient: near-white heart of each shaft, so the beams
-     read as solid columns of light, not a pale wash. */
-  var rc = svgEl('linearGradient', { id: 'rayscore-' + viewKey, x1: '0', y1: '1', x2: '0', y2: '0' });
-  rc.appendChild(svgEl('stop', { offset: '0', 'stop-color': '#fffdf4', 'stop-opacity': '1' }));
-  rc.appendChild(svgEl('stop', { offset: '0.4', 'stop-color': '#fff6d8', 'stop-opacity': '0.85' }));
-  rc.appendChild(svgEl('stop', { offset: '0.75', 'stop-color': '#fff3c4', 'stop-opacity': '0.3' }));
-  rc.appendChild(svgEl('stop', { offset: '1', 'stop-color': '#fff3c4', 'stop-opacity': '0' }));
-  defs.appendChild(rc);
+
   svg.appendChild(defs);
   var gProv = svgEl('g');
   GEO.features.forEach(function (f) {
@@ -456,12 +433,14 @@ function buildSvgView(svg, isMain) {
      clear, and quest.css breathes it on the live map. */
   var gGlow = svgEl('g', { 'class': 'glow-layer' });
   GEO.features.forEach(function (f) {
-    var h = svgEl('path', { d: f.d, fill: 'none', stroke: '#ffc46b',
-      'stroke-width': 0.15, 'stroke-linejoin': 'round',
-      opacity: provGlowOpacity(f.code) });
-    h.style.pointerEvents = 'none';
-    parts.glow[f.code] = h;
-    gGlow.appendChild(h);
+    var g = svgEl('g', { opacity: provGlowOpacity(f.code) });
+    g.style.pointerEvents = 'none';
+    g.appendChild(svgEl('path', { d: f.d, fill: 'none', stroke: '#ffbf5e',
+      'stroke-width': 0.62, 'stroke-linejoin': 'round', opacity: 0.34 }));
+    g.appendChild(svgEl('path', { d: f.d, fill: 'none', stroke: '#fff6d8',
+      'stroke-width': 0.1, 'stroke-linejoin': 'round', opacity: 0.95 }));
+    parts.glow[f.code] = g;
+    gGlow.appendChild(g);
   });
   svg.appendChild(gGlow);
   /* Crisp province outlines above the photo fills, so Canada's
@@ -475,67 +454,11 @@ function buildSvgView(svg, isMain) {
     gOut.appendChild(o);
   });
   svg.appendChild(gOut);
-  /* Light rays: thin straight beams pour up from the map's
-     southern seam and fade as they rise, like sun shafts coming
-     through a crack (Minji's reference, 2026-11-13). Plain
-     polygons filled with the defs gradient above — no filters,
-     so the poster keeps them. The layer fades as the map fills;
-     refreshProvinceFills() keeps its opacity current. */
-  var gRays = svgEl('g', { 'class': 'rays-layer', opacity: raysGroupOpacity() });
-  gRays.style.pointerEvents = 'none';
-  /* v4 (Minji, 2026-11-13: v3 still read as NO light effect on
-     the phone - the beams multiplied out to ~0.15 effective
-     opacity in a pale cream that washed out over the land fills).
-     Now: near-VERTICAL double shafts from nine cracks - a wide
-     golden outer beam plus a near-white core - with gradients
-     that stay bright along most of the shaft, bright source
-     glows at each crack, and a stronger pool at the seam. The
-     attribute opacities keep the poster snapshot lit; the --o
-     custom property lets quest.css shimmer and stretch the
-     shafts upward on the live map. */
-  var beamSrcX = [0.08, 0.18, 0.29, 0.40, 0.50, 0.60, 0.71, 0.82, 0.92];
-  var beamFan = [[-5, 0.82], [0, 1.05], [5, 0.9]];
-  var roy = FULL.y + FULL.h * 1.02;
-  function beamPts(rox, a, rLen, b0, b1) {
-    var tx = rox + Math.sin(a) * rLen, ty = roy - Math.cos(a) * rLen;
-    var px = Math.cos(a), py = Math.sin(a);
-    return [
-      (rox - px * b0).toFixed(2) + ',' + (roy - py * b0).toFixed(2),
-      (rox + px * b0).toFixed(2) + ',' + (roy + py * b0).toFixed(2),
-      (tx + px * b1).toFixed(2) + ',' + (ty + py * b1).toFixed(2),
-      (tx - px * b1).toFixed(2) + ',' + (ty - py * b1).toFixed(2)
-    ].join(' ');
-  }
-  /* A pool of light along the seam the shafts pour out of. */
-  gRays.appendChild(svgEl('ellipse', { cx: FULL.x + FULL.w * 0.5, cy: roy,
-    rx: FULL.w * 0.42, ry: FULL.h * 0.055, fill: '#ffd97a', opacity: 0.38 }));
-  beamSrcX.forEach(function (fx, si) {
-    var rox = FULL.x + FULL.w * fx;
-    /* Bright glow right at the crack, so each source reads. */
-    gRays.appendChild(svgEl('ellipse', { cx: rox, cy: roy,
-      rx: 1.3, ry: 0.3, fill: '#fff3c4', opacity: 0.8 }));
-    beamFan.forEach(function (bf, bi) {
-      if ((si * 2 + bi) % 4 === 3) return; /* vary density per crack */
-      var a = bf[0] * Math.PI / 180;
-      var rLen = FULL.h * bf[1];
-      var bo = 0.5 + ((si * 5 + bi * 2) % 4) * 0.06;
-      var outer = svgEl('polygon', { points: beamPts(rox, a, rLen, 0.55, 1.7),
-        'class': 'ray ray-outer', fill: 'url(#raysgrad-' + viewKey + ')',
-        opacity: bo.toFixed(2) });
-      outer.style.setProperty('--o', bo.toFixed(2));
-      outer.style.animationDelay = (-((si * 1.3 + bi * 0.9) % 5)).toFixed(1) + 's';
-      gRays.appendChild(outer);
-      var co = 0.78 + ((si * 3 + bi) % 3) * 0.07;
-      var core = svgEl('polygon', { points: beamPts(rox, a, rLen, 0.2, 0.62),
-        'class': 'ray', fill: 'url(#rayscore-' + viewKey + ')',
-        opacity: co.toFixed(2) });
-      core.style.setProperty('--o', co.toFixed(2));
-      core.style.animationDelay = (-((si * 1.1 + bi * 0.7) % 5)).toFixed(1) + 's';
-      gRays.appendChild(core);
-    });
-  });
-  parts.rays = gRays;
-  svg.appendChild(gRays);
+  /* v5 (Minji, 2026-11-13, after the v4 screenshot): no
+     free-standing beams - she wants the light to follow the
+     MAP'S OWN LINES. That glow now lives in the province glow
+     groups above and in the luminous cell seams drawn by
+     renderPhotoFills(). */
   /* Decorative pixel maple trees printed on the map's bottom ocean
      corners, like illustrations on an old game map. Living inside the
      SVG means they can never collide with the HUD or dock chrome. */
@@ -629,7 +552,6 @@ function refreshProvinceFills() {
         parts.glow[code].setAttribute('opacity', provGlowOpacity(code));
       }
     });
-    if (parts.rays) parts.rays.setAttribute('opacity', raysGroupOpacity());
   });
 }
 
@@ -795,11 +717,11 @@ function renderPhotoFills(parts) {
       if (!cell) return;
       g.appendChild(svgEl('path', { d: cellPathD(cell),
         fill: 'none',
-        stroke: 'rgba(255,196,107,0.09)', 'stroke-width': 0.10,
+        stroke: 'rgba(255,191,94,0.40)', 'stroke-width': 0.24,
         'stroke-linejoin': 'round' }));
       g.appendChild(svgEl('path', { d: cellPathD(cell),
         fill: 'none',
-        stroke: 'rgba(255,246,214,0.22)', 'stroke-width': 0.04,
+        stroke: 'rgba(255,246,214,0.8)', 'stroke-width': 0.07,
         'stroke-linejoin': 'round' }));
     });
     /* Filled cells: the photo, cover-fit over the cell's bbox and
