@@ -1062,7 +1062,7 @@ function applyView() {
   var h = view.w * (r.height / Math.max(r.width, 1));
   mapSvg.setAttribute('viewBox',
     (view.cx - view.w / 2) + ' ' + (view.cy - h / 2) + ' ' + view.w + ' ' + h);
-  $('zoomReset').hidden = !(view.w < fitWidth() * 0.985);
+  $('zoomReset').hidden = !(view.w < homeFraming().w * 0.985);
   Object.keys(mapParts.labelEls).forEach(function (code) {
     var el = mapParts.labelEls[code];
     var focused = focusCode === code;
@@ -1083,11 +1083,30 @@ function clampView() {
   view.cx = Math.min(Math.max(view.cx, FULL.x - mx), FULL.x + FULL.w + mx);
   view.cy = Math.min(Math.max(view.cy, FULL.y - my), FULL.y + FULL.h + my);
 }
+/* The framing the map calls home. Landscape/desktop: the whole
+   country fitted. Portrait phones (Minji, 2026-11-13, phone-
+   first): the whole-country fit shrinks Canada to a thin band
+   mid-screen, so home starts zoomed into the southern park belt
+   instead — sized so the land fills ~82% of the stage height,
+   zoom clamped to 1.6–3.1x. The full map stays a pinch away. */
+function homeFraming() {
+  var f = { cx: FULL.x + FULL.w / 2, cy: FULL.y + FULL.h / 2, w: fitWidth() };
+  var r = stageRect();
+  if (r.height > r.width * 1.15) {
+    var targetW = (FULL.h / 0.82) * (r.width / Math.max(r.height, 1));
+    var z = Math.min(3.1, Math.max(1.6, f.w / targetW));
+    f.w = f.w / z;
+    f.cx = FULL.x + FULL.w * 0.52;
+    f.cy = FULL.y + FULL.h * 0.63;
+  }
+  return f;
+}
 function fitView() {
   if (!FULL) return;
-  view.w = fitWidth();
-  view.cx = FULL.x + FULL.w / 2;
-  view.cy = FULL.y + FULL.h / 2;
+  var f = homeFraming();
+  view.w = f.w;
+  view.cx = f.cx;
+  view.cy = f.cy;
   applyView();
 }
 function zoomAt(p, factor) {
@@ -1165,7 +1184,8 @@ function exitFocus(fromPop) {
   clearTempCamp();
   refreshFocusUI();
   renderMap();   /* and the "!" badges go away with the focus */
-  animateViewTo(FULL.x + FULL.w / 2, FULL.y + FULL.h / 2, fitWidth(), 650);
+  var hf = homeFraming();
+  animateViewTo(hf.cx, hf.cy, hf.w, 650);
 }
 function focusLatLng(lat, lng, w) {
   var xy = project(lat, lng);

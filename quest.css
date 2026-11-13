@@ -417,3 +417,27 @@ body{
   #leafLayer{display:none}
   .quest-badge{animation:none}
 }
+
+/* ---------- Phone-first polish (Minji, 2026-11-13) ----------
+   Small screens are the main stage: a thinner frame, a slimmer
+   HUD and a shorter dock hand their room over to the map.
+   Landscape and desktop keep the chunky chrome untouched. */
+@media (max-width:760px){
+  #mapFrame{inset:6px}
+  .hudbar{top:calc(.5rem + env(safe-area-inset-top));left:.5rem;right:.5rem;padding:.42rem .5rem .48rem}
+  .hud-brand{font-size:.88rem}
+  .lvl-chip{font-size:.46rem;padding:.24rem .38rem;border-width:2.5px}
+  .exp-wrap{margin-top:.38rem}
+  .exp-track{height:16px}
+  .exp-text{font-size:.44rem}
+  .hud-chips{margin-top:.38rem;gap:.3rem}
+  .side-chip{font-size:.66rem;padding:.16rem .42rem}
+  .back-btn{top:calc(8.3rem + env(safe-area-inset-top))}
+  .game-dock{padding-bottom:calc(.55rem + env(safe-area-inset-bottom))}
+  .game-menu{gap:.45rem}
+  .gbtn{min-height:54px;border-width:3px}
+  .gbtn .g-ico{font-size:1.25rem}
+  .gbtn .g-lab{font-size:.44rem}
+  .hint-pill{font-size:.76rem;padding:.3rem .7rem}
+  .map-tools{bottom:calc(8.35rem + env(safe-area-inset-bottom))}
+}
