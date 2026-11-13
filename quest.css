@@ -21,8 +21,8 @@
 
 /* The stage sits on wooden planks; the map lives inside its frame. */
 body{
-  background:#3a2410 url('wood.png');
-  background-size:512px 512px;
+  background:#3a2410 url('wood.jpg');
+  background-size:cover;
 }
 #mapFrame{
   position:absolute;inset:10px;
@@ -32,13 +32,13 @@ body{
     inset 0 0 0 7px var(--wood),
     0 5px 0 rgba(40,22,5,.45);
   /* Dark wooden table (Minji, 2026-11-13): a real wood-grain
-     texture (wood.png, generated planks) under a soft vignette,
+     texture (wood.jpg, walnut planks) under a soft vignette,
      so the parchment sheet reads as a map lying on a table.
      Flat gradient stripes did not read as wood — her words. */
   background:
     radial-gradient(120% 100% at 50% 42%, rgba(0,0,0,0) 55%, rgba(20,10,2,.38) 100%),
-    url('wood.png');
-  background-size:auto, 512px 512px;
+    url('wood.jpg');
+  background-size:auto, cover;
   overflow:hidden;
 }
 #mapSvg{position:absolute;inset:0;filter:none;touch-action:none}
