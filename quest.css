@@ -33,18 +33,14 @@ body{
     inset 0 0 0 7px var(--wood),
     0 5px 0 rgba(40,22,5,.45);
   background:
-    radial-gradient(120% 90% at 50% 0%, #fff8ec 0%, var(--paper) 55%, #fbeedd 100%);
+    radial-gradient(120% 90% at 50% 40%, #f0dfae 0%, #e7d199 60%, #d9bd85 100%);
   overflow:hidden;
 }
 #mapSvg{position:absolute;inset:0;filter:none;touch-action:none}
 
-/* Ghost-map glow breathes slowly on the live map. Page CSS never
-   reaches the exported poster SVG, so the poster keeps the
-   static halo baked into its path attributes. */
-@keyframes glowPulse{from{opacity:.55}to{opacity:1}}
-.glow-layer{animation:glowPulse 4.5s ease-in-out infinite alternate}
-/* glow v5: light follows the map lines; no ray layer anymore */
-@media (prefers-reduced-motion: reduce){ .glow-layer{animation:none} }
+/* Treasure-map reskin (2026-11-13): the golden glow layers are
+   gone — coastlines are sepia ink baked into path attributes, so
+   there is no breathing glow layer left for CSS to animate. */
 
 /* Generic pixel window (HUD bar, level-up popup) */
 .win{
@@ -193,13 +189,13 @@ body{
 .park-marker .hit,.camp-marker .hit{fill:transparent}
 .mk-shadow{fill:rgba(74,44,18,.32)}
 .mk-open{fill:#fffdf4;stroke:var(--wood-d)}
-.mk-open-side{fill:#eef5fd;stroke:var(--sky-d)}
+.mk-open-side{fill:#fdf6e3;stroke:#6e4f2a}
 .mk-q{font-weight:800;text-anchor:middle;pointer-events:none;fill:#a08b74}
 .mk-done{fill:#ef6f6c;stroke:#fffdf4}
-.mk-done-side{fill:var(--sky);stroke:#fffdf4}
+.mk-done-side{fill:#d9a441;stroke:#fff6d8}
 .mk-star{fill:#fff;font-weight:800;text-anchor:middle;pointer-events:none}
 .mk-photo{stroke:#ef6f6c}
-.mk-photo-side{stroke:var(--sky-d)}
+.mk-photo-side{stroke:#8a5a2b}
 .mk-open-bonus{fill:#fdf3d8;stroke:#c9932b}
 .mk-done-bonus{fill:#e8b23f;stroke:#fffdf4}
 .mk-photo-bonus{stroke:#c9932b}
@@ -362,10 +358,10 @@ body{
   animation:qBounce 1.15s ease-in-out infinite;
 }
 .q-badge-c{fill:#ffcf3f;stroke:#5b3a1e}
-.q-badge-c-side{fill:#3d7ab5;stroke:#fffdf4}
+.q-badge-c-side{fill:#f4e7ba;stroke:#6e4f2a}
 .q-badge-halo{fill:#fffdf4;opacity:.85}
 .q-badge-txt{font-weight:900;text-anchor:middle;pointer-events:none;fill:#5b3a1e}
-.q-badge-txt-side{fill:#fff}
+.q-badge-txt-side{fill:#5b3a1e}
 @keyframes qBounce{
   0%,100%{transform:translateY(0) scale(1,1)}
   30%{transform:translateY(-9%) scale(.96,1.04)}
