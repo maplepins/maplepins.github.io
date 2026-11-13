@@ -384,14 +384,14 @@ function provRatio(code) {
   return done / parks.length;
 }
 function provFillOpacity(code) { return 0.55 + 0.45 * provRatio(code); }
-function provGlowOpacity(code) { return 0.38 * (1 - provRatio(code)); }
+function provGlowOpacity(code) { return 0.22 * (1 - provRatio(code)); }
 /* Light-ray layer strength (Minji, 2026-11-13: thin lines, and
    straight shafts of light rising through the map's seams):
    full while the map is mostly empty, easing to a whisper once
    the photos have taken over. */
 function raysGroupOpacity() {
   var total = PARKS_MAIN.length || 48;
-  return 1 - 0.7 * (mainCleared() / total);
+  return 1 - 0.5 * (mainCleared() / total);
 }
 function buildSvgView(svg, isMain) {
   var viewKey = isMain ? 'm' : 'p';
@@ -413,15 +413,15 @@ function buildSvgView(svg, isMain) {
   /* Light-ray gradient: warm at the seam the rays pour from,
      fully transparent at the top of the shaft. */
   var rg = svgEl('linearGradient', { id: 'raysgrad-' + viewKey, x1: '0', y1: '1', x2: '0', y2: '0' });
-  rg.appendChild(svgEl('stop', { offset: '0', 'stop-color': '#ffe9b0', 'stop-opacity': '0.55' }));
+  rg.appendChild(svgEl('stop', { offset: '0', 'stop-color': '#fff3c4', 'stop-opacity': '0.9' }));
+  rg.appendChild(svgEl('stop', { offset: '0.45', 'stop-color': '#ffe9b0', 'stop-opacity': '0.34' }));
   rg.appendChild(svgEl('stop', { offset: '1', 'stop-color': '#ffe9b0', 'stop-opacity': '0' }));
   defs.appendChild(rg);
   svg.appendChild(defs);
   var gProv = svgEl('g');
   GEO.features.forEach(function (f) {
     var p = svgEl('path', { d: f.d, fill: provinceFill(f.code),
-      'fill-opacity': provFillOpacity(f.code), stroke: '#ffffff',
-      'stroke-width': 0.13, 'stroke-linejoin': 'round' });
+      'fill-opacity': provFillOpacity(f.code), stroke: 'none' });
     p.dataset.code = f.code;
     parts.paths[f.code] = p;
     gProv.appendChild(p);
@@ -448,7 +448,7 @@ function buildSvgView(svg, isMain) {
   var gGlow = svgEl('g', { 'class': 'glow-layer' });
   GEO.features.forEach(function (f) {
     var h = svgEl('path', { d: f.d, fill: 'none', stroke: '#ffc46b',
-      'stroke-width': 0.30, 'stroke-linejoin': 'round',
+      'stroke-width': 0.15, 'stroke-linejoin': 'round',
       opacity: provGlowOpacity(f.code) });
     h.style.pointerEvents = 'none';
     parts.glow[f.code] = h;
@@ -460,7 +460,7 @@ function buildSvgView(svg, isMain) {
   var gOut = svgEl('g');
   GEO.features.forEach(function (f) {
     var o = svgEl('path', { d: f.d, fill: 'none', stroke: '#ffffff',
-      'stroke-width': 0.17, 'stroke-linejoin': 'round' });
+      'stroke-width': 0.07, 'stroke-linejoin': 'round', opacity: 0.32 });
     o.style.pointerEvents = 'none';
     parts.outlines[f.code] = o;
     gOut.appendChild(o);
@@ -474,26 +474,42 @@ function buildSvgView(svg, isMain) {
      refreshProvinceFills() keeps its opacity current. */
   var gRays = svgEl('g', { 'class': 'rays-layer', opacity: raysGroupOpacity() });
   gRays.style.pointerEvents = 'none';
-  var beamAngles = [-38, -26, -15, -5, 5, 16, 27, 38];
-  var rox = FULL.x + FULL.w * 0.5, roy = FULL.y + FULL.h * 1.03;
-  var rLen = FULL.h * 1.18;
-  beamAngles.forEach(function (deg, i) {
-    var a = deg * Math.PI / 180;
-    var tx = rox + Math.sin(a) * rLen, ty = roy - Math.cos(a) * rLen;
-    var px = Math.cos(a), py = Math.sin(a);
-    var b0 = 0.22, b1 = 1.35;
-    var pts = [
-      (rox - px * b0).toFixed(2) + ',' + (roy - py * b0).toFixed(2),
-      (rox + px * b0).toFixed(2) + ',' + (roy + py * b0).toFixed(2),
-      (tx + px * b1).toFixed(2) + ',' + (ty + py * b1).toFixed(2),
-      (tx - px * b1).toFixed(2) + ',' + (ty - py * b1).toFixed(2)
-    ].join(' ');
-    gRays.appendChild(svgEl('polygon', { points: pts,
-      fill: 'url(#raysgrad-' + viewKey + ')', opacity: (i % 2 === 0) ? 0.20 : 0.12 }));
+  /* v3 (Minji, 2026-11-13: v2's single faint fan was invisible
+     on the phone): shafts pour up from SEVEN cracks spread along
+     the southern seam, each spilling a few narrow, bright beams
+     of differing heights - the cave-photo feel. Each beam's base
+     opacity also rides in a --o custom property so quest.css can
+     shimmer the beams on staggered delays; the plain attribute
+     keeps the poster snapshot lit. */
+  var beamSrcX = [0.16, 0.28, 0.40, 0.50, 0.60, 0.72, 0.84];
+  var beamFan = [[-13, 0.95], [-4, 0.78], [6, 1.0], [14, 0.7]];
+  var roy = FULL.y + FULL.h * 1.02;
+  beamSrcX.forEach(function (fx, si) {
+    var rox = FULL.x + FULL.w * fx;
+    beamFan.forEach(function (bf, bi) {
+      if ((si + bi) % 3 === 2) return; /* vary density per crack */
+      var a = bf[0] * Math.PI / 180;
+      var rLen = FULL.h * bf[1];
+      var tx = rox + Math.sin(a) * rLen, ty = roy - Math.cos(a) * rLen;
+      var px = Math.cos(a), py = Math.sin(a);
+      var b0 = 0.15, b1 = 0.8;
+      var pts = [
+        (rox - px * b0).toFixed(2) + ',' + (roy - py * b0).toFixed(2),
+        (rox + px * b0).toFixed(2) + ',' + (roy + py * b0).toFixed(2),
+        (tx + px * b1).toFixed(2) + ',' + (ty + py * b1).toFixed(2),
+        (tx - px * b1).toFixed(2) + ',' + (ty - py * b1).toFixed(2)
+      ].join(' ');
+      var bo = 0.34 + ((si * 7 + bi * 3) % 5) * 0.07;
+      var poly = svgEl('polygon', { points: pts, 'class': 'ray',
+        fill: 'url(#raysgrad-' + viewKey + ')', opacity: bo.toFixed(2) });
+      poly.style.setProperty('--o', bo.toFixed(2));
+      poly.style.animationDelay = (-((si * 1.3 + bi * 0.9) % 5)).toFixed(1) + 's';
+      gRays.appendChild(poly);
+    });
   });
   /* A soft pool of light where the rays pour out. */
-  gRays.appendChild(svgEl('ellipse', { cx: rox, cy: roy,
-    rx: FULL.w * 0.13, ry: FULL.h * 0.045, fill: '#ffe9b0', opacity: 0.16 }));
+  gRays.appendChild(svgEl('ellipse', { cx: FULL.x + FULL.w * 0.5, cy: roy,
+    rx: FULL.w * 0.34, ry: FULL.h * 0.05, fill: '#ffe9b0', opacity: 0.20 }));
   parts.rays = gRays;
   svg.appendChild(gRays);
   /* Decorative pixel maple trees printed on the map's bottom ocean
@@ -755,11 +771,11 @@ function renderPhotoFills(parts) {
       if (!cell) return;
       g.appendChild(svgEl('path', { d: cellPathD(cell),
         fill: 'none',
-        stroke: 'rgba(255,196,107,0.20)', 'stroke-width': 0.13,
+        stroke: 'rgba(255,196,107,0.09)', 'stroke-width': 0.10,
         'stroke-linejoin': 'round' }));
       g.appendChild(svgEl('path', { d: cellPathD(cell),
         fill: 'none',
-        stroke: 'rgba(255,246,214,0.62)', 'stroke-width': 0.05,
+        stroke: 'rgba(255,246,214,0.22)', 'stroke-width': 0.04,
         'stroke-linejoin': 'round' }));
     });
     /* Filled cells: the photo, cover-fit over the cell's bbox and
@@ -781,10 +797,10 @@ function renderPhotoFills(parts) {
          rim — so a filled piece reads 뚜렷하게 against both its
          photo neighbours and the ghosted empty land. */
       g.appendChild(svgEl('path', { d: cellPathD(cell), fill: 'none',
-        stroke: 'rgba(91,58,30,0.38)', 'stroke-width': 0.17,
+        stroke: 'rgba(91,58,30,0.30)', 'stroke-width': 0.09,
         'stroke-linejoin': 'round' }));
       g.appendChild(svgEl('path', { d: cellPathD(cell), fill: 'none',
-        stroke: 'rgba(255,255,250,0.98)', 'stroke-width': 0.10,
+        stroke: 'rgba(255,255,250,0.55)', 'stroke-width': 0.055,
         'stroke-linejoin': 'round' }));
     });
   });

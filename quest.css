@@ -43,8 +43,9 @@ body{
    static halo baked into its path attributes. */
 @keyframes glowPulse{from{opacity:.55}to{opacity:1}}
 .glow-layer{animation:glowPulse 4.5s ease-in-out infinite alternate}
-.rays-layer{animation:glowPulse 7s ease-in-out infinite alternate}
-@media (prefers-reduced-motion: reduce){ .glow-layer,.rays-layer{animation:none} }
+@keyframes rayShimmer{from{opacity:calc(var(--o,0.45)*0.35)}to{opacity:var(--o,0.45)}}
+.rays-layer .ray{animation:rayShimmer 3.6s ease-in-out infinite alternate}
+@media (prefers-reduced-motion: reduce){ .glow-layer,.rays-layer .ray{animation:none} }
 
 /* Generic pixel window (HUD bar, level-up popup) */
 .win{
