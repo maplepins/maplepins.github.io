@@ -4,7 +4,7 @@
    no-signal park — and still picks up new versions on the next
    launch after a deploy. Bump CACHE whenever the shell changes
    in a way that must reach installed users immediately. */
-var CACHE = 'maplepins-shell-v2';
+var CACHE = 'maplepins-shell-v3';
 var SHELL = [
   './',
   'index.html',

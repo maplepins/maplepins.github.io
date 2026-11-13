@@ -360,18 +360,35 @@ async function loadGeo() {
 /* Province fill warms up as its MAIN quests clear — a living map.
    (Bonus, side quests and camps never recolour a province.) */
 var PROV_FILL = ['#f3ede1', '#eef0da', '#e4eece', '#d7e8bd', '#c6e0a6'];
-function provinceFill(code) {
+function provParks(code) {
   var parks = PARKS_MAIN.filter(function (p) { return p.province === code; });
   if (code === 'NT') parks = parks.concat(PARKS_MAIN.filter(function (p) { return p.id === 'wood-buffalo'; }));
+  return parks;
+}
+function provinceFill(code) {
+  var parks = provParks(code);
   if (!parks.length) return PROV_FILL[0];
   var done = parks.filter(function (p) { return !!state.visits[p.id]; }).length;
   var idx = Math.min(PROV_FILL.length - 1, Math.floor(done / parks.length * PROV_FILL.length));
   return PROV_FILL[idx];
 }
+/* Ghost-map look (Minji, 2026-11-13): uncleared land sits
+   translucent, its seams traced by a soft golden glow; every
+   stamped photo lands at full strength with a crisp edge, so
+   the map visibly "wakes up" piece by piece. Both numbers ride
+   on the province's main-quest progress ratio. */
+function provRatio(code) {
+  var parks = provParks(code);
+  if (!parks.length) return 0;
+  var done = parks.filter(function (p) { return !!state.visits[p.id]; }).length;
+  return done / parks.length;
+}
+function provFillOpacity(code) { return 0.55 + 0.45 * provRatio(code); }
+function provGlowOpacity(code) { return 0.55 * (1 - provRatio(code)); }
 function buildSvgView(svg, isMain) {
   var viewKey = isMain ? 'm' : 'p';
   var parts = { paths:{}, labels:null, markers:null, camps:null, temp:null, badges:null,
-    labelEls:{}, fillGroups:{}, outlines:{}, viewKey: viewKey };
+    labelEls:{}, fillGroups:{}, outlines:{}, glow:{}, viewKey: viewKey };
   /* Clips: one per province (its outline) and one per park cell.
      Ids are prefixed per view so map and poster never collide. */
   var defs = svgEl('defs');
@@ -388,7 +405,8 @@ function buildSvgView(svg, isMain) {
   svg.appendChild(defs);
   var gProv = svgEl('g');
   GEO.features.forEach(function (f) {
-    var p = svgEl('path', { d: f.d, fill: provinceFill(f.code), stroke: '#ffffff',
+    var p = svgEl('path', { d: f.d, fill: provinceFill(f.code),
+      'fill-opacity': provFillOpacity(f.code), stroke: '#ffffff',
       'stroke-width': 0.13, 'stroke-linejoin': 'round' });
     p.dataset.code = f.code;
     parts.paths[f.code] = p;
@@ -406,6 +424,21 @@ function buildSvgView(svg, isMain) {
     gFills.appendChild(g);
   });
   svg.appendChild(gFills);
+  /* Ghost-map glow: a wide, faint golden halo traced under each
+     province outline that still has empty quests. It is a plain
+     fat stroke (no SVG filter), so it survives the poster's
+     serialization; refreshProvinceFills() fades it per province
+     as quests clear, and quest.css breathes it on the live map. */
+  var gGlow = svgEl('g', { 'class': 'glow-layer' });
+  GEO.features.forEach(function (f) {
+    var h = svgEl('path', { d: f.d, fill: 'none', stroke: '#ffc46b',
+      'stroke-width': 1.05, 'stroke-linejoin': 'round',
+      opacity: provGlowOpacity(f.code) });
+    h.style.pointerEvents = 'none';
+    parts.glow[f.code] = h;
+    gGlow.appendChild(h);
+  });
+  svg.appendChild(gGlow);
   /* Crisp province outlines above the photo fills, so Canada's
      shape stays readable even when a province is all photos. */
   var gOut = svgEl('g');
@@ -505,6 +538,10 @@ function refreshProvinceFills() {
     if (!parts) return;
     Object.keys(parts.paths).forEach(function (code) {
       parts.paths[code].setAttribute('fill', provinceFill(code));
+      parts.paths[code].setAttribute('fill-opacity', provFillOpacity(code));
+      if (parts.glow && parts.glow[code]) {
+        parts.glow[code].setAttribute('opacity', provGlowOpacity(code));
+      }
     });
   });
 }
@@ -661,15 +698,20 @@ function renderPhotoFills(parts) {
     var parks = ALL_PARKS.filter(function (p) {
       return p.province === code && p.tier !== 'side';
     });
-    /* Empty cells: no fill at all, just a whisper-thin puzzle edge
-       over the province's progress colour — an empty slot should
-       read as a faint outline, never as a card floating on the map. */
+    /* Empty cells: no fill at all — the slot is traced by a soft
+       glowing seam (a wide faint halo under a thin bright core),
+       so the empty map reads as a ghost of itself, waiting to be
+       filled. Never a card floating on the map. */
     parks.forEach(function (park) {
       var cell = CELLS[park.id];
       if (!cell) return;
       g.appendChild(svgEl('path', { d: cellPathD(cell),
         fill: 'none',
-        stroke: 'rgba(91,58,30,0.30)', 'stroke-width': 0.045,
+        stroke: 'rgba(255,196,107,0.32)', 'stroke-width': 0.30,
+        'stroke-linejoin': 'round' }));
+      g.appendChild(svgEl('path', { d: cellPathD(cell),
+        fill: 'none',
+        stroke: 'rgba(255,246,214,0.80)', 'stroke-width': 0.055,
         'stroke-linejoin': 'round' }));
     });
     /* Filled cells: the photo, cover-fit over the cell's bbox and
@@ -687,8 +729,14 @@ function renderPhotoFills(parts) {
       setImageHref(img, url);
       cg.appendChild(img);
       g.appendChild(cg);
+      /* Crisp double edge — a warm dark keyline under a bright
+         rim — so a filled piece reads 뚜렷하게 against both its
+         photo neighbours and the ghosted empty land. */
       g.appendChild(svgEl('path', { d: cellPathD(cell), fill: 'none',
-        stroke: 'rgba(255,253,244,0.95)', 'stroke-width': 0.09,
+        stroke: 'rgba(91,58,30,0.38)', 'stroke-width': 0.17,
+        'stroke-linejoin': 'round' }));
+      g.appendChild(svgEl('path', { d: cellPathD(cell), fill: 'none',
+        stroke: 'rgba(255,255,250,0.98)', 'stroke-width': 0.10,
         'stroke-linejoin': 'round' }));
     });
   });
@@ -1086,6 +1134,11 @@ function refreshFocusUI() {
     Object.keys(mapParts.outlines).forEach(function (code) {
       mapParts.outlines[code].style.opacity = (!focusCode || focusCode === code) ? '' : '0.45';
     });
+    if (mapParts.glow) {
+      Object.keys(mapParts.glow).forEach(function (code) {
+        mapParts.glow[code].style.opacity = (!focusCode || focusCode === code) ? '' : '0.3';
+      });
+    }
   }
   $('tapHint').textContent = focusCode
     ? '📍 ' + PROVINCE_BY_CODE[focusCode].name + ' — tap a marker, or tap the map to pitch your tent ⛺'

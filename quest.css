@@ -38,6 +38,13 @@ body{
 }
 #mapSvg{position:absolute;inset:0;filter:none;touch-action:none}
 
+/* Ghost-map glow breathes slowly on the live map. Page CSS never
+   reaches the exported poster SVG, so the poster keeps the
+   static halo baked into its path attributes. */
+@keyframes glowPulse{from{opacity:.55}to{opacity:1}}
+.glow-layer{animation:glowPulse 4.5s ease-in-out infinite alternate}
+@media (prefers-reduced-motion: reduce){ .glow-layer{animation:none} }
+
 /* Generic pixel window (HUD bar, level-up popup) */
 .win{
   background:var(--parch);
