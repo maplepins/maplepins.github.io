@@ -22,8 +22,8 @@
 /* The stage sits on wooden planks; the map lives inside its frame. */
 body{
   background:
-    repeating-linear-gradient(90deg,#7c4c22 0 44px,#74461f 44px 47px),
-    #7c4c22;
+    repeating-linear-gradient(90deg,#65401f 0 44px,#5d3719 44px 47px),
+    #65401f;
 }
 #mapFrame{
   position:absolute;inset:10px;
@@ -32,8 +32,13 @@ body{
     inset 0 0 0 3px var(--wood-l),
     inset 0 0 0 7px var(--wood),
     0 5px 0 rgba(40,22,5,.45);
+  /* Dark wooden table (Minji, 2026-11-13): plank rows with dark
+     seams and a whisper of grain streaks, so the parchment sheet
+     reads as a map lying on wood, not a full-bleed fill. */
   background:
-    radial-gradient(120% 90% at 50% 40%, #f0dfae 0%, #e7d199 60%, #d9bd85 100%);
+    repeating-linear-gradient(93deg, rgba(255,214,150,.05) 0 7px, rgba(0,0,0,0) 7px 19px),
+    repeating-linear-gradient(0deg, #55351a 0 30px, #472c13 30px 33px, #5d3c1e 33px 63px, #4e3015 63px 66px),
+    #55351a;
   overflow:hidden;
 }
 #mapSvg{position:absolute;inset:0;filter:none;touch-action:none}

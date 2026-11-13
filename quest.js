@@ -359,7 +359,7 @@ async function loadGeo() {
 }
 /* Province fill warms up as its MAIN quests clear — a living map.
    (Bonus, side quests and camps never recolour a province.) */
-var PROV_FILL = ['#f2e4b8', '#f1e0af', '#efdb9f', '#edd38c', '#eac97e'];
+var PROV_FILL = ['#e9cf8e', '#e6c67f', '#e2ba6c', '#ddac55', '#d69e40'];
 function provParks(code) {
   var parks = PARKS_MAIN.filter(function (p) { return p.province === code; });
   if (code === 'NT') parks = parks.concat(PARKS_MAIN.filter(function (p) { return p.id === 'wood-buffalo'; }));
@@ -404,23 +404,24 @@ function buildSvgView(svg, isMain) {
 
   var paperGrad = svgEl('radialGradient', { id: 'papergrad-' + viewKey,
     cx: '50%', cy: '42%', r: '75%' });
-  [['0%', '#f0dfae'], ['70%', '#e7d199'], ['100%', '#d3b87e']].forEach(function (st) {
+  [['0%', '#f4e8bc'], ['70%', '#ecd9a4'], ['100%', '#dec088']].forEach(function (st) {
     paperGrad.appendChild(svgEl('stop', { offset: st[0], 'stop-color': st[1] }));
   });
   defs.appendChild(paperGrad);
   svg.appendChild(defs);
-  /* Treasure-map sheet (Minji, 2026-11-13): the whole view is one
-     aged parchment page, so panning past the map edge still shows
-     paper, never a blank stage. Presentation attributes only, so
-     the poster export carries the paper with it. */
-  var back = svgEl('rect', { x: FULL.x - 9, y: FULL.y - 9,
-    width: FULL.w + 18, height: FULL.h + 18,
-    fill: 'url(#papergrad-' + viewKey + ')' });
-  back.style.pointerEvents = 'none';
-  svg.appendChild(back);
-  var sheet = svgEl('rect', { x: FULL.x + 0.45, y: FULL.y + 0.45,
-    width: FULL.w - 0.9, height: FULL.h - 0.9, fill: 'none',
-    stroke: '#8a6a3f', 'stroke-width': 0.07, opacity: 0.55 });
+  /* Treasure-map sheet (Minji, 2026-11-13, round 2): the map is
+     one physical parchment sheet with a torn, wavy edge, lying on
+     the dark wooden table the stage shows around it — no longer
+     parchment wall to wall. A soft offset shadow lifts the sheet
+     off the table. Presentation attributes only, so the poster
+     export carries the sheet with it. */
+  var sd = sheetPathD();
+  var shadow = svgEl('path', { d: sd, fill: '#2e1c0a', opacity: 0.35,
+    transform: 'translate(0.4 0.55)' });
+  shadow.style.pointerEvents = 'none';
+  svg.appendChild(shadow);
+  var sheet = svgEl('path', { d: sd, fill: 'url(#papergrad-' + viewKey + ')',
+    stroke: '#8a6a3f', 'stroke-width': 0.1, 'stroke-opacity': 0.75 });
   sheet.style.pointerEvents = 'none';
   svg.appendChild(sheet);
   var gProv = svgEl('g');
@@ -705,6 +706,44 @@ function makePlaceholderArt() {
     pine(52, 330, 1.15); pine(112, 344, 0.8); pine(588, 334, 1.05); pine(532, 350, 0.72);
     return c.toDataURL('image/png');
   } catch (e) { return null; }
+}
+/* Outline of the parchment sheet: a rounded rectangle a little
+   larger than the map, its edge jittered with a fixed seed (so the
+   map and the poster tear identically) and smoothed into the wavy,
+   hand-torn silhouette of Minji's reference maps. */
+function sheetPathD() {
+  var m = 1.15;
+  var x0 = FULL.x - m, y0 = FULL.y - m;
+  var x1 = FULL.x + FULL.w + m, y1 = FULL.y + FULL.h + m;
+  var seed = 1234567;
+  function rnd() {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed / 2147483648;
+  }
+  var pts = [];
+  function edge(ax, ay, bx, by, nx, ny) {
+    var len = Math.hypot(bx - ax, by - ay);
+    var steps = Math.max(2, Math.round(len / 2.3));
+    for (var i = 0; i < steps; i++) {
+      var t = i / steps;
+      var j = (i === 0) ? 0 : (rnd() - 0.5) * 0.68;
+      pts.push([ax + (bx - ax) * t + nx * j, ay + (by - ay) * t + ny * j]);
+    }
+  }
+  edge(x0, y0, x1, y0, 0, -1); edge(x1, y0, x1, y1, 1, 0);
+  edge(x1, y1, x0, y1, 0, 1); edge(x0, y1, x0, y0, -1, 0);
+  var n = pts.length;
+  var d = 'M' + pts[0][0].toFixed(2) + ',' + pts[0][1].toFixed(2);
+  for (var i = 0; i < n; i++) {
+    var p0 = pts[(i - 1 + n) % n], p1 = pts[i];
+    var p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+    d += 'C' + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(2) + ',' +
+      (p1[1] + (p2[1] - p0[1]) / 6).toFixed(2) + ' ' +
+      (p2[0] - (p3[0] - p1[0]) / 6).toFixed(2) + ',' +
+      (p2[1] - (p3[1] - p1[1]) / 6).toFixed(2) + ' ' +
+      p2[0].toFixed(2) + ',' + p2[1].toFixed(2);
+  }
+  return d + 'Z';
 }
 /* Compass rose printed on Hudson Bay, like the old maps in
    Minji's reference photos: two ink rings, an eight-point star,
