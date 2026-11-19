@@ -421,7 +421,8 @@ function buildSvgView(svg, isMain) {
   shadow.style.pointerEvents = 'none';
   svg.appendChild(shadow);
   var sheet = svgEl('path', { d: sd, fill: 'url(#papergrad-' + viewKey + ')',
-    stroke: '#8a6a3f', 'stroke-width': 0.1, 'stroke-opacity': 0.75 });
+    stroke: '#8a6a3f', 'stroke-width': 0.1, 'stroke-opacity': 0.75,
+    'data-sw': 0.1 });
   sheet.style.pointerEvents = 'none';
   svg.appendChild(sheet);
   var gProv = svgEl('g');
@@ -456,9 +457,11 @@ function buildSvgView(svg, isMain) {
     var g = svgEl('g', { opacity: 1 });
     g.style.pointerEvents = 'none';
     g.appendChild(svgEl('path', { d: f.d, fill: 'none', stroke: '#8a6a3f',
-      'stroke-width': 0.3, 'stroke-linejoin': 'round', opacity: 0.22 }));
+      'stroke-width': 0.3, 'stroke-linejoin': 'round', opacity: 0.22,
+      'data-sw': 0.3 }));
     g.appendChild(svgEl('path', { d: f.d, fill: 'none', stroke: '#543d20',
-      'stroke-width': 0.085, 'stroke-linejoin': 'round', opacity: 0.95 }));
+      'stroke-width': 0.085, 'stroke-linejoin': 'round', opacity: 0.95,
+      'data-sw': 0.085 }));
     parts.glow[f.code] = g;
     gGlow.appendChild(g);
   });
@@ -753,9 +756,9 @@ function addCompassRose(svg) {
   var g = svgEl('g');
   g.style.pointerEvents = 'none';
   g.appendChild(svgEl('circle', { cx: cx, cy: cy, r: 2.05, fill: 'none',
-    stroke: '#543d20', 'stroke-width': 0.05, opacity: 0.6 }));
+    stroke: '#543d20', 'stroke-width': 0.05, opacity: 0.6, 'data-sw': 0.05 }));
   g.appendChild(svgEl('circle', { cx: cx, cy: cy, r: 1.78, fill: 'none',
-    stroke: '#543d20', 'stroke-width': 0.03, opacity: 0.45 }));
+    stroke: '#543d20', 'stroke-width': 0.03, opacity: 0.45, 'data-sw': 0.03 }));
   [90, 0, 180, 270, 45, 135, 225, 315].forEach(function (ang) {
     var ln = (ang % 90 === 0) ? 1.75 : 1.05;
     var r = ang * Math.PI / 180, r2 = (ang + 90) * Math.PI / 180;
@@ -798,7 +801,8 @@ function renderRoute(parts) {
   }
   g.appendChild(svgEl('path', { d: d, fill: 'none', stroke: '#8a3b2a',
     'stroke-width': 0.09, 'stroke-dasharray': '0.34 0.26',
-    'stroke-linecap': 'round', opacity: 0.8 }));
+    'stroke-linecap': 'round', opacity: 0.8,
+    'data-sw': 0.09, 'data-sdash': '0.34 0.26' }));
   pts.forEach(function (pt) {
     g.appendChild(svgEl('circle', { cx: pt[0], cy: pt[1], r: 0.11, fill: '#8a3b2a' }));
   });
@@ -881,7 +885,7 @@ function renderPhotoFills(parts) {
       g.appendChild(svgEl('path', { d: cellPathD(cell),
         fill: 'none',
         stroke: 'rgba(110,79,42,0.55)', 'stroke-width': 0.05,
-        'stroke-linejoin': 'round' }));
+        'stroke-linejoin': 'round', 'data-sw': 0.05 }));
     });
     /* Filled cells: the photo, cover-fit over the cell's bbox and
        clipped to the cell shape, with a bright edge re-stroked on
@@ -903,7 +907,7 @@ function renderPhotoFills(parts) {
          neighbours and the empty parchment land. */
       g.appendChild(svgEl('path', { d: cellPathD(cell), fill: 'none',
         stroke: 'rgba(84,61,32,0.85)', 'stroke-width': 0.07,
-        'stroke-linejoin': 'round' }));
+        'stroke-linejoin': 'round', 'data-sw': 0.07 }));
     });
   });
 }
@@ -1204,6 +1208,7 @@ function fitWidth() {
   return Math.max(FULL.w, FULL.h * (r.width / Math.max(r.height, 1)));
 }
 var lastMarkerW = 0;
+var lastLineK = 0;
 /* Marker re-renders are coalesced into one per animation frame,
    and — crucially — a zoom-driven re-render rebuilds ONLY the
    markers. The photo-cell layer doesn't depend on the view at
@@ -1239,6 +1244,31 @@ function applyView() {
     el.setAttribute('font-size', fs);
     el.setAttribute('stroke-width', fs * 0.16);
   });
+  /* Zoom-thinned ink (Minji, 2026-11-19): lines are stroked in
+     data units, so a deep zoom would blow the coastlines, cell
+     seams and route up into fat ropes exactly when a small photo
+     cell finally fills the screen. Scale every registered line
+     (data-sw) by the zoom ratio instead, so on screen the ink
+     keeps the weight it has at the home framing while the photos
+     grow around it. The poster view never runs applyView, so the
+     printed map keeps its full-weight ink. */
+  var lk = Math.min(1, view.w / homeFraming().w);
+  if (!lastLineK || Math.abs(lk - lastLineK) > lastLineK * 0.02) {
+    lastLineK = lk;
+    var lineEls = mapSvg.querySelectorAll('[data-sw]');
+    for (var li = 0; li < lineEls.length; li++) {
+      var lel = lineEls[li];
+      lel.setAttribute('stroke-width',
+        (parseFloat(lel.getAttribute('data-sw')) * lk).toFixed(4));
+      var dash = lel.getAttribute('data-sdash');
+      if (dash) {
+        var dp = dash.split(' ');
+        lel.setAttribute('stroke-dasharray',
+          (parseFloat(dp[0]) * lk).toFixed(3) + ' ' +
+          (parseFloat(dp[1]) * lk).toFixed(3));
+      }
+    }
+  }
   /* Rebuilding every marker each frame would flicker photo thumbnails;
      only re-render once the zoom has drifted a few percent — and even
      then, at most once per frame and markers only (see above). */
@@ -1277,8 +1307,14 @@ function fitView() {
   view.cy = f.cy;
   applyView();
 }
+/* Deepest zoom the map allows, as a divisor of the full map width.
+   FULL.w / 40 is ~1.25 map units — the smallest photo cell
+   (Pituamkek, PEI, 1.57 units wide) can still fill a phone screen
+   with room to spare. Raised from 28 on 2026-11-19: at 28x the
+   smallest cell only just filled the screen, with no margin. */
+var MAX_ZOOM = 40;
 function zoomAt(p, factor) {
-  var newW = Math.min(Math.max(view.w * factor, FULL.w / 28), fitWidth() * 1.02);
+  var newW = Math.min(Math.max(view.w * factor, FULL.w / MAX_ZOOM), fitWidth() * 1.02);
   var k = newW / view.w;
   view.cx = p.x - (p.x - view.cx) * k;
   view.cy = p.y - (p.y - view.cy) * k;
@@ -1342,7 +1378,7 @@ function focusProvince(code) {
   var r = stageRect();
   var bw = f.bounds.x1 - f.bounds.x0, bh = f.bounds.y1 - f.bounds.y0;
   var tw = Math.max(bw * 1.3, bh * 1.3 * (r.width / Math.max(r.height, 1)));
-  tw = Math.min(Math.max(tw, FULL.w / 30), fitWidth());
+  tw = Math.min(Math.max(tw, FULL.w / MAX_ZOOM), fitWidth());
   animateViewTo((f.bounds.x0 + f.bounds.x1) / 2, (f.bounds.y0 + f.bounds.y1) / 2, tw, 650);
 }
 function exitFocus(fromPop) {
@@ -1358,6 +1394,25 @@ function exitFocus(fromPop) {
 function focusLatLng(lat, lng, w) {
   var xy = project(lat, lng);
   animateViewTo(xy[0], xy[1], w || FULL.w / 6, 600);
+}
+/* Zoom the camera onto one park's photo cell, so a stamped photo
+   fills the screen instead of hiding in a postage-stamp tile.
+   Minji, 2026-11-19: small-province cells (PEI etc.) stay
+   unreadable after stamping because the map never moves — the
+   whole-country view is the problem, not the photo. Target width
+   fits the cell's bbox with a ~30% margin on the tighter axis;
+   the floor is the same MAX_ZOOM pinch limit, so even the
+   smallest cell (Pituamkek, 1.57 units wide) fills a phone
+   screen. Side quests own no cell, so they no-op here. */
+function focusCell(park) {
+  var cell = CELLS[park.id];
+  if (!cell) return;
+  var r = stageRect();
+  var aspect = r.width / Math.max(r.height, 1);
+  var cw = cell.x1 - cell.x0, ch = cell.y1 - cell.y0;
+  var tw = Math.max(cw, ch * aspect) * 1.3;
+  tw = Math.min(Math.max(tw, FULL.w / MAX_ZOOM), fitWidth());
+  animateViewTo((cell.x0 + cell.x1) / 2, (cell.y0 + cell.y1) / 2, tw, 700);
 }
 
 /* ---------------- Pointer: drag to pan, tap to act ---------------- */
@@ -1686,6 +1741,11 @@ function openPark(park) {
     $('pkOpen').hidden = false;
     $('pkDone').hidden = true;
   }
+  /* A cleared park's photo already shows large in this sheet — but
+     fly the map to its cell behind the sheet too, so closing the
+     sheet leaves the photo filling the screen instead of a tiny
+     tile on the whole-country map. */
+  if (visit && visit.photo) focusCell(park);
   openSheet('parkSheet');
 }
 $('pkWentBtn').addEventListener('click', function () {
@@ -1743,6 +1803,10 @@ $('visitForm').addEventListener('submit', function (e) {
     var floatText = currentPark.tier === 'main' ? '+100 EXP'
       : (currentPark.tier === 'bonus' ? '★ BONUS' : '★ SIDE');
     playClearFx(currentPark.tier === 'main' && after > before ? after : 0, floatText);
+    /* Land the camera on the stamped cell so the photo is actually
+       visible right away — especially the small-province cells.
+       Side quests own no cell, so focusCell no-ops for them. */
+    focusCell(currentPark);
   }
 });
 $('pkPhotoInput').addEventListener('change', function () {
