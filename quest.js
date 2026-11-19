@@ -807,7 +807,7 @@ function renderRoute(parts) {
     'stroke-linecap': 'round', opacity: 0.8,
     'data-sw': 0.09, 'data-sdash': '0.34 0.26' }));
   pts.forEach(function (pt) {
-    g.appendChild(svgEl('circle', { cx: pt[0], cy: pt[1], r: 0.11, fill: '#8a3b2a' }));
+    g.appendChild(svgEl('circle', { cx: pt[0], cy: pt[1], r: 0.11, fill: '#8a3b2a', 'data-r': 0.11 }));
   });
 }
 /* Treasure-chest park marker (Minji, 2026-11-13): an unopened
@@ -1289,6 +1289,15 @@ function applyView() {
           (parseFloat(dp[0]) * lk).toFixed(3) + ' ' +
           (parseFloat(dp[1]) * lk).toFixed(3));
       }
+    }
+    /* Route waypoint dots carry data-r instead of data-sw: same
+       thinning, applied to the radius, so a dot stays a dot at deep
+       zoom instead of ballooning into a disc behind the (now
+       smaller) chest. */
+    var dotEls = mapSvg.querySelectorAll('[data-r]');
+    for (var di = 0; di < dotEls.length; di++) {
+      dotEls[di].setAttribute('r',
+        (parseFloat(dotEls[di].getAttribute('data-r')) * lk).toFixed(4));
     }
   }
   /* Rebuilding every marker each frame would flicker photo thumbnails;
