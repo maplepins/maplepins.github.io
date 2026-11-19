@@ -825,6 +825,13 @@ function chestMarker(x, y, s, opened, bonus) {
   var ink = '#543d20', gold = bonus ? '#f7d774' : '#e8b23f';
   var body = bonus ? '#96622e' : '#8a5a2b', lid = bonus ? '#b57e3a' : '#a9713f';
   var g = svgEl('g', { 'class': 'park-marker' });
+  /* Outline widths ride on s: as absolute units they stayed 0.09
+     wide while chestShrink shrank the chest itself, so at deep
+     zoom the ink swallowed the whole marker into a dark blob
+     (v15 live test). At the normal s~0.40 these equal the old
+     absolute widths. */
+  var inkW = Math.max(0.012, s * 0.22), inkW2 = Math.max(0.01, s * 0.17),
+      inkW3 = Math.max(0.008, s * 0.12), inkW4 = Math.max(0.009, s * 0.15);
   g.appendChild(svgEl('ellipse', { cx: x + s * 0.08, cy: y + s * 0.82,
     rx: s * 1.02, ry: s * 0.22, fill: 'rgba(74,44,18,0.30)' }));
   var lidD = 'M' + (x - s) + ',' + (y - s * 0.05) + 'L' + (x - s) + ',' + (y - s * 0.55) +
@@ -835,21 +842,21 @@ function chestMarker(x, y, s, opened, bonus) {
     'L' + (x + s * 0.16) + ',' + (y - s * 0.05) + 'Z';
   if (opened) {
     var lidG = svgEl('g', { transform: 'rotate(-32 ' + (x - s) + ' ' + (y - s * 0.05) + ')' });
-    lidG.appendChild(svgEl('path', { d: lidD, fill: lid, stroke: ink, 'stroke-width': 0.09, 'stroke-linejoin': 'round' }));
+    lidG.appendChild(svgEl('path', { d: lidD, fill: lid, stroke: ink, 'stroke-width': inkW, 'stroke-linejoin': 'round' }));
     lidG.appendChild(svgEl('path', { d: bandD, fill: gold }));
     g.appendChild(lidG);
     g.appendChild(svgEl('rect', { x: x - s, y: y - s * 0.32, width: s * 2, height: s * 0.3,
-      fill: '#3a2410', stroke: ink, 'stroke-width': 0.07 }));
+      fill: '#3a2410', stroke: ink, 'stroke-width': inkW2 }));
     [[-0.45, -0.34, 0.17], [0.05, -0.42, 0.2], [0.5, -0.32, 0.16]].forEach(function (cn) {
       g.appendChild(svgEl('circle', { cx: x + s * cn[0], cy: y + s * cn[1], r: s * cn[2],
-        fill: '#f7d774', stroke: '#c9932b', 'stroke-width': 0.05 }));
+        fill: '#f7d774', stroke: '#c9932b', 'stroke-width': inkW3 }));
     });
   } else {
-    g.appendChild(svgEl('path', { d: lidD, fill: lid, stroke: ink, 'stroke-width': 0.09, 'stroke-linejoin': 'round' }));
+    g.appendChild(svgEl('path', { d: lidD, fill: lid, stroke: ink, 'stroke-width': inkW, 'stroke-linejoin': 'round' }));
     g.appendChild(svgEl('path', { d: bandD, fill: gold }));
   }
   g.appendChild(svgEl('rect', { x: x - s, y: y - s * 0.05, width: s * 2, height: s * 0.85,
-    fill: body, stroke: ink, 'stroke-width': 0.09 }));
+    fill: body, stroke: ink, 'stroke-width': inkW }));
   g.appendChild(svgEl('rect', { x: x - s * 0.16, y: y - s * 0.05, width: s * 0.32, height: s * 0.85, fill: gold }));
   if (bonus) {
     [-0.68, 0.52].forEach(function (off) {
@@ -857,7 +864,7 @@ function chestMarker(x, y, s, opened, bonus) {
     });
   }
   g.appendChild(svgEl('rect', { x: x - s * 0.17, y: y - s * 0.26, width: s * 0.34, height: s * 0.42,
-    fill: gold, stroke: ink, 'stroke-width': 0.06 }));
+    fill: gold, stroke: ink, 'stroke-width': inkW4 }));
   if (!opened) {
     g.appendChild(svgEl('circle', { cx: x, cy: y + s * 0.02, r: s * 0.055, fill: ink }));
   } else {
@@ -943,7 +950,7 @@ function mainMarkerRadius(zoom, interactive) {
    the 40x floor, never below x0.35 — a chest must stay tappable
    and recognisable. */
 function chestShrink(zoom) {
-  return Math.max(0.35, Math.pow(Math.max(zoom / 3, 1), -0.35));
+  return Math.max(0.32, Math.pow(Math.max(zoom / 3, 1), -0.45));
 }
 function markerSize() { /* radius of a main marker at the live view */
   return mainMarkerRadius(FULL.w / view.w, true);
@@ -1061,7 +1068,7 @@ function photoMarker(x, y, s, photo, ringCls, target) {
   setImageHref(img, photo);
   g.appendChild(img);
   g.appendChild(svgEl('circle', { cx: x, cy: y, r: s,
-    fill: 'none', 'class': ringCls, 'stroke-width': 0.13 }));
+    fill: 'none', 'class': ringCls, 'stroke-width': Math.max(0.015, s * 0.28) }));
   var hit = svgEl('circle', { cx: x, cy: y, r: s * 1.8 + 0.15, 'class': 'hit' });
   g.appendChild(hit);
   return g;
