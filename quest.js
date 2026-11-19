@@ -250,7 +250,10 @@ var PHOTO_READ_FAIL_MSG = 'That photo could not be read. If it is a ' +
 
 /* ---------------- Illustrated map (same recipe as app.js) ---------------- */
 var SVGNS = 'http://www.w3.org/2000/svg';
-var K_LNG = 0.55, PAD = 0.6;
+/* K_LNG 0.55 -> 0.65 (Minji, 2026-11-19): the map stretched a
+   bit wider east-west; every feature projects through this one
+   constant, so land, cells and markers all stretch together. */
+var K_LNG = 0.65, PAD = 0.6;
 /* Province labels: abbreviations only at country zoom (the full
    names collided with each other and clipped at the frame edge);
    the focused province swaps its label to the full name. Anchors
@@ -931,6 +934,17 @@ function mainMarkerRadius(zoom, interactive) {
   if (interactive && focusCode) s *= 1.12;
   return Math.min(s, (FULL.w / zoom) * 0.052);
 }
+/* Chests shrink as you zoom in (Minji, 2026-11-19, the marker half
+   of "lines get thinner when I zoom"): past the cap above, a
+   chest's screen size stays flat, so at 40x it would sit on top of
+   the photo cell the user zoomed in to see. Anchored at zoom 3 so
+   the normal browse range (phone home framing, province focus)
+   looks exactly as before; deeper zooms fall to about x0.40 at
+   the 40x floor, never below x0.35 — a chest must stay tappable
+   and recognisable. */
+function chestShrink(zoom) {
+  return Math.max(0.35, Math.pow(Math.max(zoom / 3, 1), -0.35));
+}
 function markerSize() { /* radius of a main marker at the live view */
   return mainMarkerRadius(FULL.w / view.w, true);
 }
@@ -1110,7 +1124,8 @@ function renderMarkersInto(parts, interactive, viewW) {
     if (side && !showSide) return;
     var xy = project(park.lat, park.lng);
     items.push({ park: park, side: side, x: xy[0], y: xy[1], ox: xy[0], oy: xy[1],
-      s: sMain * (side ? 0.76 : (park.tier === 'bonus' ? 0.9 : 1)) });
+      s: sMain * (side ? 0.76 : (park.tier === 'bonus' ? 0.9 : 1) *
+        (interactive ? chestShrink(zoom) : 1)) });
   });
   if (interactive && items.length > 1) declutterMarkers(items);
   items.forEach(function (it) {
@@ -1411,8 +1426,19 @@ function focusCell(park) {
   var aspect = r.width / Math.max(r.height, 1);
   var cw = cell.x1 - cell.x0, ch = cell.y1 - cell.y0;
   var tw = Math.max(cw, ch * aspect) * 1.3;
+  var cx = (cell.x0 + cell.x1) / 2, cy = (cell.y0 + cell.y1) / 2;
+  /* A lone park can own a huge cell (Pukaskwa holds most of
+     northern Ontario): framing the whole cell is barely closer
+     than the province view, so the flight reads as "nothing
+     happened" and the photo stays small. Cap the width and centre
+     on the park itself when the cap binds. */
+  if (tw > FULL.w / 5) {
+    tw = FULL.w / 5;
+    var xy = project(park.lat, park.lng);
+    cx = xy[0]; cy = xy[1];
+  }
   tw = Math.min(Math.max(tw, FULL.w / MAX_ZOOM), fitWidth());
-  animateViewTo((cell.x0 + cell.x1) / 2, (cell.y0 + cell.y1) / 2, tw, 700);
+  animateViewTo(cx, cy, tw, 700);
 }
 
 /* ---------------- Pointer: drag to pan, tap to act ---------------- */
@@ -1805,8 +1831,11 @@ $('visitForm').addEventListener('submit', function (e) {
     playClearFx(currentPark.tier === 'main' && after > before ? after : 0, floatText);
     /* Land the camera on the stamped cell so the photo is actually
        visible right away — especially the small-province cells.
-       Side quests own no cell, so focusCell no-ops for them. */
-    focusCell(currentPark);
+       Side quests own no cell, so focusCell no-ops for them. The
+       flight waits ~0.9s so the QUEST CLEAR stamp lands first and
+       the flight is not hidden under the stamp overlay. */
+    var stampedPark = currentPark;
+    setTimeout(function () { focusCell(stampedPark); }, 900);
   }
 });
 $('pkPhotoInput').addEventListener('change', function () {
