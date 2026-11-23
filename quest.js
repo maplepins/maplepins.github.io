@@ -1349,7 +1349,7 @@ function fitWidth() {
   /* The frame includes the parchment sheet and its scroll rolls,
      so zooming all the way out shows the whole unfurled map. */
   return Math.max(FULL.w + SHEET_PAD * 2,
-    (FULL.h + SHEET_PAD * 2) * (r.width / Math.max(r.height, 1)));
+    (FULL.h + SHEET_PAD * 2 + 1.6) * (r.width / Math.max(r.height, 1)));
 }
 var lastMarkerW = 0;
 var lastLineK = 0;
