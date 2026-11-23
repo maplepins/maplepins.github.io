@@ -254,6 +254,9 @@ var SVGNS = 'http://www.w3.org/2000/svg';
    bit wider east-west; every feature projects through this one
    constant, so land, cells and markers all stretch together. */
 var K_LNG = 0.65, PAD = 0.6;
+/* Frame beyond FULL that shows the whole parchment sheet, its
+   scroll rolls and their shadows when fully zoomed out. */
+var SHEET_PAD = 2.9;
 /* Province labels: abbreviations only at country zoom (the full
    names collided with each other and clipped at the frame edge);
    the focused province swaps its label to the full name. Anchors
@@ -407,10 +410,40 @@ function buildSvgView(svg, isMain) {
 
   var paperGrad = svgEl('radialGradient', { id: 'papergrad-' + viewKey,
     cx: '50%', cy: '42%', r: '75%' });
-  [['0%', '#f4e8bc'], ['70%', '#ecd9a4'], ['100%', '#dec088']].forEach(function (st) {
+  [['0%', '#f6ecc0'], ['45%', '#f0dda6'], ['78%', '#e3c88f'], ['100%', '#d6b678']].forEach(function (st) {
     paperGrad.appendChild(svgEl('stop', { offset: st[0], 'stop-color': st[1] }));
   });
   defs.appendChild(paperGrad);
+  /* Scroll + ageing gradients (Minji, 2026-11-23). gradA fades a
+     shadow out left-to-right, gradB fades it in; between them the
+     two rolls get consistent light from one side. */
+  function gradStops(el, stops) {
+    stops.forEach(function (st) {
+      var s = svgEl('stop', { offset: st[0], 'stop-color': st[1] });
+      if (st[2] != null) s.setAttribute('stop-opacity', st[2]);
+      el.appendChild(s);
+    });
+    return el;
+  }
+  defs.appendChild(gradStops(svgEl('linearGradient',
+    { id: 'rollgrad-' + viewKey, x1: '0', y1: '0', x2: '1', y2: '0' }),
+    [['0%', '#54401f'], ['18%', '#8a6a3f'], ['38%', '#c3a262'],
+     ['52%', '#e8d09b'], ['68%', '#a9834a'], ['86%', '#77572c'],
+     ['100%', '#463216']]));
+  defs.appendChild(gradStops(svgEl('radialGradient',
+    { id: 'rollcap-' + viewKey, cx: '42%', cy: '40%', r: '75%' }),
+    [['0%', '#e2cd94'], ['55%', '#bfa065'], ['82%', '#8a6a3f'],
+     ['100%', '#654820']]));
+  defs.appendChild(gradStops(svgEl('linearGradient',
+    { id: 'gradA-' + viewKey, x1: '0', y1: '0', x2: '1', y2: '0' }),
+    [['0%', '#38240d', 0.44], ['100%', '#38240d', 0]]));
+  defs.appendChild(gradStops(svgEl('linearGradient',
+    { id: 'gradB-' + viewKey, x1: '0', y1: '0', x2: '1', y2: '0' }),
+    [['0%', '#38240d', 0], ['100%', '#38240d', 0.44]]));
+  defs.appendChild(gradStops(svgEl('radialGradient',
+    { id: 'stain-' + viewKey, cx: '50%', cy: '50%', r: '50%' }),
+    [['0%', '#92682c', 0.10], ['60%', '#92682c', 0.05],
+     ['100%', '#92682c', 0]]));
   svg.appendChild(defs);
   /* Treasure-map sheet (Minji, 2026-11-13, round 2): the map is
      one physical parchment sheet with a torn, wavy edge, lying on
@@ -419,6 +452,9 @@ function buildSvgView(svg, isMain) {
      off the table. Presentation attributes only, so the poster
      export carries the sheet with it. */
   var sd = sheetPathD();
+  var sheetClip = svgEl('clipPath', { id: 'sheetclip-' + viewKey });
+  sheetClip.appendChild(svgEl('path', { d: sd }));
+  defs.appendChild(sheetClip);
   var shadow = svgEl('path', { d: sd, fill: '#2e1c0a', opacity: 0.35,
     transform: 'translate(0.4 0.55)' });
   shadow.style.pointerEvents = 'none';
@@ -428,6 +464,14 @@ function buildSvgView(svg, isMain) {
     'data-sw': 0.1 });
   sheet.style.pointerEvents = 'none';
   svg.appendChild(sheet);
+  /* Aged rim (Minji, 2026-11-23): the sheet's edge darkens in soft
+     steps, like parchment handled for years. */
+  [[1.15, 0.07], [0.62, 0.10], [0.30, 0.14]].forEach(function (rim) {
+    var rp = svgEl('path', { d: sd, fill: 'none', stroke: '#7a5426',
+      'stroke-width': rim[0], 'stroke-opacity': rim[1], 'data-sw': rim[0] });
+    rp.style.pointerEvents = 'none';
+    svg.appendChild(rp);
+  });
   var gProv = svgEl('g');
   GEO.features.forEach(function (f) {
     var p = svgEl('path', { d: f.d, fill: provinceFill(f.code),
@@ -448,6 +492,36 @@ function buildSvgView(svg, isMain) {
     gFills.appendChild(g);
   });
   svg.appendChild(gFills);
+  /* Parchment ageing (Minji, 2026-11-23): faint stains and two soft
+     fold creases, clipped to the sheet — the paper looks handled,
+     not printed. Presentation attributes only (poster-safe). */
+  var gAge = svgEl('g', { 'clip-path': 'url(#sheetclip-' + viewKey + ')' });
+  gAge.style.pointerEvents = 'none';
+  var ageSeed = 20261123;
+  function ageRnd() {
+    ageSeed = (ageSeed * 1103515245 + 12345) % 2147483648;
+    return ageSeed / 2147483648;
+  }
+  for (var bi = 0; bi < 16; bi++) {
+    gAge.appendChild(svgEl('ellipse', {
+      cx: (FULL.x - 1 + ageRnd() * (FULL.w + 2)).toFixed(2),
+      cy: (FULL.y - 1 + ageRnd() * (FULL.h + 2)).toFixed(2),
+      rx: (3 + ageRnd() * 6.5).toFixed(2),
+      ry: (2 + ageRnd() * 4.5).toFixed(2),
+      fill: 'url(#stain-' + viewKey + ')' }));
+  }
+  function crease(x1, y1, x2, y2, dx, dy) {
+    gAge.appendChild(svgEl('line', { x1: x1, y1: y1, x2: x2, y2: y2,
+      stroke: '#654820', 'stroke-width': 0.15, opacity: 0.13,
+      'data-sw': 0.15 }));
+    gAge.appendChild(svgEl('line', { x1: x1 + dx, y1: y1 + dy,
+      x2: x2 + dx, y2: y2 + dy, stroke: '#fff6d6', 'stroke-width': 0.15,
+      opacity: 0.15, 'data-sw': 0.15 }));
+  }
+  var creaseX = FULL.x + FULL.w * 0.52, creaseY = FULL.y + FULL.h * 0.47;
+  crease(creaseX, FULL.y - 1.15, creaseX, FULL.y + FULL.h + 1.15, 0.17, 0);
+  crease(FULL.x - 1.15, creaseY, FULL.x + FULL.w + 1.15, creaseY, 0, 0.17);
+  svg.appendChild(gAge);
   /* Treasure-map ink (Minji, 2026-11-13, replacing the golden
      glow after five rejected versions): every coastline is drawn
      like a hand-inked map line — a soft offset echo under a thin
@@ -503,7 +577,52 @@ function buildSvgView(svg, isMain) {
      map only — renderMarkersInto leaves this empty for the poster). */
   parts.badges = svgEl('g'); svg.appendChild(parts.badges);
   if (isMain) { parts.temp = svgEl('g'); svg.appendChild(parts.temp); }
-  svg.setAttribute('viewBox', FULL.x + ' ' + FULL.y + ' ' + FULL.w + ' ' + FULL.h);
+  /* Scroll rolls (Minji, 2026-11-23): the sheet is a parchment
+     scroll unfurled on the table — its left and right edges wrap
+     around rolls of paper. Each roll: a shadow strip on the table,
+     a shadow strip on the parchment, a cylinder band lit by a
+     horizontal gradient, two faint paper-layer seams, and spiral
+     end caps. Presentation attributes only (poster-safe). */
+  var rollG = svgEl('g');
+  rollG.style.pointerEvents = 'none';
+  var rollM = 1.15;
+  var rollY0 = FULL.y - rollM - 0.05, rollY1 = FULL.y + FULL.h + rollM + 0.05;
+  var rollW = 2.0;
+  [FULL.x - rollM, FULL.x + FULL.w + rollM].forEach(function (xe) {
+    rollG.appendChild(svgEl('rect', { x: xe - 1.7, y: rollY0 - 0.3,
+      width: 0.9, height: (rollY1 - rollY0) + 0.6,
+      fill: 'url(#gradB-' + viewKey + ')', opacity: 0.5 }));
+    rollG.appendChild(svgEl('rect', { x: xe + 0.8, y: rollY0 - 0.3,
+      width: 0.9, height: (rollY1 - rollY0) + 0.6,
+      fill: 'url(#gradA-' + viewKey + ')', opacity: 0.5 }));
+    rollG.appendChild(svgEl('rect', { x: xe - rollW / 2, y: rollY0,
+      width: rollW, height: rollY1 - rollY0, rx: 0.16,
+      fill: 'url(#rollgrad-' + viewKey + ')', stroke: '#4a3319',
+      'stroke-width': 0.05, 'stroke-opacity': 0.6 }));
+    [0.30, 0.72].forEach(function (fx) {
+      rollG.appendChild(svgEl('rect', {
+        x: xe - rollW / 2 + rollW * fx, y: rollY0 + 0.15, width: 0.07,
+        height: (rollY1 - rollY0) - 0.3, fill: '#4a3319', opacity: 0.10 }));
+    });
+    [rollY0, rollY1].forEach(function (cy) {
+      rollG.appendChild(svgEl('ellipse', { cx: xe, cy: cy, rx: rollW / 2,
+        ry: rollW * 0.36, fill: 'url(#rollcap-' + viewKey + ')',
+        stroke: '#543d20', 'stroke-width': 0.05, 'stroke-opacity': 0.7 }));
+      rollG.appendChild(svgEl('ellipse', { cx: xe, cy: cy,
+        rx: rollW * 0.44, ry: rollW * 0.31, fill: 'none',
+        stroke: '#8a6a3f', 'stroke-width': 0.06, 'stroke-opacity': 0.75 }));
+      rollG.appendChild(svgEl('ellipse', { cx: xe, cy: cy,
+        rx: rollW * 0.31, ry: rollW * 0.225, fill: 'none',
+        stroke: '#7d5c2e', 'stroke-width': 0.07, 'stroke-opacity': 0.8 }));
+      rollG.appendChild(svgEl('ellipse', { cx: xe, cy: cy,
+        rx: rollW * 0.15, ry: rollW * 0.11, fill: '#8a6a3f',
+        stroke: '#543d20', 'stroke-width': 0.04, 'stroke-opacity': 0.7 }));
+    });
+  });
+  svg.appendChild(rollG);
+  svg.setAttribute('viewBox', (FULL.x - SHEET_PAD) + ' ' +
+    (FULL.y - SHEET_PAD) + ' ' + (FULL.w + SHEET_PAD * 2) + ' ' +
+    (FULL.h + SHEET_PAD * 2));
   return parts;
 }
 /* ---------------- Pixel maple trees (map decoration) ----------------
@@ -1227,7 +1346,10 @@ function renderMap() {
 function stageRect() { return mapSvg.getBoundingClientRect(); }
 function fitWidth() {
   var r = stageRect();
-  return Math.max(FULL.w, FULL.h * (r.width / Math.max(r.height, 1)));
+  /* The frame includes the parchment sheet and its scroll rolls,
+     so zooming all the way out shows the whole unfurled map. */
+  return Math.max(FULL.w + SHEET_PAD * 2,
+    (FULL.h + SHEET_PAD * 2) * (r.width / Math.max(r.height, 1)));
 }
 var lastMarkerW = 0;
 var lastLineK = 0;
@@ -2118,10 +2240,11 @@ function savePosterPng() {
   clone.setAttribute('xmlns', SVGNS);
   clone.setAttribute('xmlns:xlink', XLINK_NS);
   var drawW = 1500 * PS;
-  var drawH = Math.round(drawW * FULL.h / FULL.w);
+  var drawH = Math.round(drawW * (FULL.h + SHEET_PAD * 2) / (FULL.w + SHEET_PAD * 2));
   clone.setAttribute('width', drawW);
   clone.setAttribute('height', drawH);
-  clone.setAttribute('viewBox', FULL.x + ' ' + FULL.y + ' ' + FULL.w + ' ' + FULL.h);
+  clone.setAttribute('viewBox', (FULL.x - SHEET_PAD) + ' ' + (FULL.y - SHEET_PAD) +
+    ' ' + (FULL.w + SHEET_PAD * 2) + ' ' + (FULL.h + SHEET_PAD * 2));
   var svgStr = new XMLSerializer().serializeToString(clone);
   var url = URL.createObjectURL(new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' }));
   var img = new Image();
