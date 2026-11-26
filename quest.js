@@ -254,9 +254,11 @@ var SVGNS = 'http://www.w3.org/2000/svg';
    bit wider east-west; every feature projects through this one
    constant, so land, cells and markers all stretch together. */
 var K_LNG = 0.65, PAD = 0.6;
-/* Frame beyond FULL that shows the whole parchment sheet, its
-   scroll rolls and their shadows when fully zoomed out. */
-var SHEET_PAD = 2.9;
+/* Frame beyond FULL that shows the whole map panel and its soft
+   shadow when fully zoomed out. (Was 2.9 in the scroll era, when
+   the frame had to clear the rolled parchment edges; the winter
+   panel needs far less headroom.) */
+var SHEET_PAD = 1.2;
 /* Province labels: abbreviations only at country zoom (the full
    names collided with each other and clipped at the frame edge);
    the focused province swaps its label to the full name. Anchors
@@ -363,9 +365,12 @@ async function loadGeo() {
   var w = (maxLng - minLng) * K_LNG, h = maxLat - minLat;
   FULL = { x: -PAD, y: -PAD, w: w + PAD * 2, h: h + PAD * 2 };
 }
-/* Province fill warms up as its MAIN quests clear — a living map.
-   (Bonus, side quests and camps never recolour a province.) */
-var PROV_FILL = ['#e9cf8e', '#e6c67f', '#e2ba6c', '#ddac55', '#d69e40'];
+/* Province fill deepens as its MAIN quests clear — a living map.
+   (Bonus, side quests and camps never recolour a province.)
+   Winter reskin (Minji, 2026-11-26): the old parchment-gold ramp
+   became a snow ramp, untouched snow to a slightly deeper ice
+   blue as a province fills in. */
+var PROV_FILL = ['#f7fbff', '#eff7fd', '#e7f2fa', '#e0eff8', '#dceefb'];
 function provParks(code) {
   var parks = PARKS_MAIN.filter(function (p) { return p.province === code; });
   if (code === 'NT') parks = parks.concat(PARKS_MAIN.filter(function (p) { return p.id === 'wood-buffalo'; }));
@@ -379,10 +384,9 @@ function provinceFill(code) {
   return PROV_FILL[idx];
 }
 /* Ghost-map look (Minji, 2026-11-13): uncleared land sits
-   translucent, its seams traced by a soft golden glow; every
-   stamped photo lands at full strength with a crisp edge, so
-   the map visibly "wakes up" piece by piece. Both numbers ride
-   on the province's main-quest progress ratio. */
+   translucent; every stamped photo lands at full strength with
+   a crisp edge, so the map visibly "wakes up" piece by piece.
+   Both numbers ride on the province's main-quest progress ratio. */
 function provRatio(code) {
   var parks = provParks(code);
   if (!parks.length) return 0;
@@ -408,15 +412,9 @@ function buildSvgView(svg, isMain) {
     defs.appendChild(cp);
   });
 
-  var paperGrad = svgEl('radialGradient', { id: 'papergrad-' + viewKey,
-    cx: '50%', cy: '42%', r: '75%' });
-  [['0%', '#f6ecc0'], ['45%', '#f0dda6'], ['78%', '#e3c88f'], ['100%', '#d6b678']].forEach(function (st) {
-    paperGrad.appendChild(svgEl('stop', { offset: st[0], 'stop-color': st[1] }));
-  });
-  defs.appendChild(paperGrad);
-  /* Scroll + ageing gradients (Minji, 2026-11-23). gradA fades a
-     shadow out left-to-right, gradB fades it in; between them the
-     two rolls get consistent light from one side. */
+  /* Winter panel (Minji, 2026-11-26): the map sits on a clean
+     rounded panel in a pale ice-blue gradient; the soft shadow
+     pool under it is a radial wash of deep winter blue. */
   function gradStops(el, stops) {
     stops.forEach(function (st) {
       var s = svgEl('stop', { offset: st[0], 'stop-color': st[1] });
@@ -426,52 +424,31 @@ function buildSvgView(svg, isMain) {
     return el;
   }
   defs.appendChild(gradStops(svgEl('linearGradient',
-    { id: 'rollgrad-' + viewKey, x1: '0', y1: '0', x2: '1', y2: '0' }),
-    [['0%', '#54401f'], ['18%', '#8a6a3f'], ['38%', '#c3a262'],
-     ['52%', '#e8d09b'], ['68%', '#a9834a'], ['86%', '#77572c'],
-     ['100%', '#463216']]));
+    { id: 'panelgrad-' + viewKey, x1: '0', y1: '0', x2: '0', y2: '1' }),
+    [['0%', '#eef6fb'], ['100%', '#e2eff8']]));
   defs.appendChild(gradStops(svgEl('radialGradient',
-    { id: 'rollcap-' + viewKey, cx: '42%', cy: '40%', r: '75%' }),
-    [['0%', '#e2cd94'], ['55%', '#bfa065'], ['82%', '#8a6a3f'],
-     ['100%', '#654820']]));
-  defs.appendChild(gradStops(svgEl('linearGradient',
-    { id: 'gradA-' + viewKey, x1: '0', y1: '0', x2: '1', y2: '0' }),
-    [['0%', '#38240d', 0.44], ['100%', '#38240d', 0]]));
-  defs.appendChild(gradStops(svgEl('linearGradient',
-    { id: 'gradB-' + viewKey, x1: '0', y1: '0', x2: '1', y2: '0' }),
-    [['0%', '#38240d', 0], ['100%', '#38240d', 0.44]]));
-  defs.appendChild(gradStops(svgEl('radialGradient',
-    { id: 'stain-' + viewKey, cx: '50%', cy: '50%', r: '50%' }),
-    [['0%', '#92682c', 0.10], ['60%', '#92682c', 0.05],
-     ['100%', '#92682c', 0]]));
+    { id: 'panelshadow-' + viewKey, cx: '50%', cy: '50%', r: '50%' }),
+    [['0%', '#0b2138', 0.34], ['62%', '#0b2138', 0.16],
+     ['100%', '#0b2138', 0]]));
   svg.appendChild(defs);
-  /* Treasure-map sheet (Minji, 2026-11-13, round 2): the map is
-     one physical parchment sheet with a torn, wavy edge, lying on
-     the dark wooden table the stage shows around it — no longer
-     parchment wall to wall. A soft offset shadow lifts the sheet
-     off the table. Presentation attributes only, so the poster
-     export carries the sheet with it. */
-  var sd = sheetPathD();
-  var sheetClip = svgEl('clipPath', { id: 'sheetclip-' + viewKey });
-  sheetClip.appendChild(svgEl('path', { d: sd }));
-  defs.appendChild(sheetClip);
-  var shadow = svgEl('path', { d: sd, fill: '#2e1c0a', opacity: 0.35,
-    transform: 'translate(0.4 0.55)' });
+  /* Winter panel (Minji, 2026-11-26, replacing the treasure-map
+     parchment sheet and its scroll rolls): one clean rounded
+     panel a little larger than the land, floating over the deep
+     winter-blue stage, grounded by a soft shadow pool.
+     Presentation attributes only, so the poster export carries
+     the panel with it. */
+  var pd = panelPathD();
+  var shadow = svgEl('rect', { x: FULL.x - 1.25, y: FULL.y - 1.25,
+    width: FULL.w + 2.5, height: FULL.h + 2.5, rx: 1.9,
+    fill: 'url(#panelshadow-' + viewKey + ')',
+    transform: 'translate(0.35 0.6)' });
   shadow.style.pointerEvents = 'none';
   svg.appendChild(shadow);
-  var sheet = svgEl('path', { d: sd, fill: 'url(#papergrad-' + viewKey + ')',
-    stroke: '#8a6a3f', 'stroke-width': 0.1, 'stroke-opacity': 0.75,
+  var sheet = svgEl('path', { d: pd, fill: 'url(#panelgrad-' + viewKey + ')',
+    stroke: '#b9d2e4', 'stroke-width': 0.1, 'stroke-opacity': 0.9,
     'data-sw': 0.1 });
   sheet.style.pointerEvents = 'none';
   svg.appendChild(sheet);
-  /* Aged rim (Minji, 2026-11-23): the sheet's edge darkens in soft
-     steps, like parchment handled for years. */
-  [[1.15, 0.07], [0.62, 0.10], [0.30, 0.14]].forEach(function (rim) {
-    var rp = svgEl('path', { d: sd, fill: 'none', stroke: '#7a5426',
-      'stroke-width': rim[0], 'stroke-opacity': rim[1], 'data-sw': rim[0] });
-    rp.style.pointerEvents = 'none';
-    svg.appendChild(rp);
-  });
   var gProv = svgEl('g');
   GEO.features.forEach(function (f) {
     var p = svgEl('path', { d: f.d, fill: provinceFill(f.code),
@@ -492,70 +469,41 @@ function buildSvgView(svg, isMain) {
     gFills.appendChild(g);
   });
   svg.appendChild(gFills);
-  /* Parchment ageing (Minji, 2026-11-23): faint stains and two soft
-     fold creases, clipped to the sheet — the paper looks handled,
-     not printed. Presentation attributes only (poster-safe). */
-  var gAge = svgEl('g', { 'clip-path': 'url(#sheetclip-' + viewKey + ')' });
-  gAge.style.pointerEvents = 'none';
-  var ageSeed = 20261123;
-  function ageRnd() {
-    ageSeed = (ageSeed * 1103515245 + 12345) % 2147483648;
-    return ageSeed / 2147483648;
-  }
-  for (var bi = 0; bi < 16; bi++) {
-    gAge.appendChild(svgEl('ellipse', {
-      cx: (FULL.x - 1 + ageRnd() * (FULL.w + 2)).toFixed(2),
-      cy: (FULL.y - 1 + ageRnd() * (FULL.h + 2)).toFixed(2),
-      rx: (3 + ageRnd() * 6.5).toFixed(2),
-      ry: (2 + ageRnd() * 4.5).toFixed(2),
-      fill: 'url(#stain-' + viewKey + ')' }));
-  }
-  function crease(x1, y1, x2, y2, dx, dy) {
-    gAge.appendChild(svgEl('line', { x1: x1, y1: y1, x2: x2, y2: y2,
-      stroke: '#654820', 'stroke-width': 0.15, opacity: 0.13,
-      'data-sw': 0.15 }));
-    gAge.appendChild(svgEl('line', { x1: x1 + dx, y1: y1 + dy,
-      x2: x2 + dx, y2: y2 + dy, stroke: '#fff6d6', 'stroke-width': 0.15,
-      opacity: 0.15, 'data-sw': 0.15 }));
-  }
-  var creaseX = FULL.x + FULL.w * 0.52, creaseY = FULL.y + FULL.h * 0.47;
-  crease(creaseX, FULL.y - 1.15, creaseX, FULL.y + FULL.h + 1.15, 0.17, 0);
-  crease(FULL.x - 1.15, creaseY, FULL.x + FULL.w + 1.15, creaseY, 0, 0.17);
-  svg.appendChild(gAge);
-  /* Treasure-map ink (Minji, 2026-11-13, replacing the golden
-     glow after five rejected versions): every coastline is drawn
-     like a hand-inked map line — a soft offset echo under a thin
-     sepia line. Ink never fades as quests clear; a drawn map
-     keeps its lines and the photos bring the colour. The groups
+
+  /* Coastline ink (winter palette, Minji 2026-11-26; the layer
+     itself dates to the 2026-11-13 reskin): every coastline is a
+     soft pale echo under a thin slate-blue line. The lines never
+     fade as quests clear; the photos bring the colour. The groups
      still ride in parts.glow so province focus-dimming (which
      dims a whole province's lines) keeps working unchanged. */
   var gGlow = svgEl('g');
   GEO.features.forEach(function (f) {
     var g = svgEl('g', { opacity: 1 });
     g.style.pointerEvents = 'none';
-    g.appendChild(svgEl('path', { d: f.d, fill: 'none', stroke: '#8a6a3f',
-      'stroke-width': 0.3, 'stroke-linejoin': 'round', opacity: 0.22,
+    g.appendChild(svgEl('path', { d: f.d, fill: 'none', stroke: '#9dbfd8',
+      'stroke-width': 0.3, 'stroke-linejoin': 'round', opacity: 0.35,
       'data-sw': 0.3 }));
-    g.appendChild(svgEl('path', { d: f.d, fill: 'none', stroke: '#543d20',
+    g.appendChild(svgEl('path', { d: f.d, fill: 'none', stroke: '#5b7d99',
       'stroke-width': 0.085, 'stroke-linejoin': 'round', opacity: 0.95,
       'data-sw': 0.085 }));
     parts.glow[f.code] = g;
     gGlow.appendChild(g);
   });
   svg.appendChild(gGlow);
-  /* Dashed journey route rides above the photo fills; populated
-     by renderRoute() from the stamped parks in date order. */
+  /* Dashed journey route (Canadian red since the winter reskin)
+     rides above the photo fills; populated by renderRoute() from
+     the stamped parks in date order. */
   parts.route = svgEl('g');
   parts.route.style.pointerEvents = 'none';
   svg.appendChild(parts.route);
-  /* No separate outline layer anymore: the ink coastlines
+  /* No separate outline layer anymore: the slate coastlines
      above keep Canada's shape readable even when a province is
-     all photos, the way a printed treasure map would. */
+     all photos. */
   svg.appendChild(svgEl('g'));
   addCompassRose(svg);
-  /* Decorative pixel maple trees printed on the map's bottom ocean
-     corners, like illustrations on an old game map. Living inside the
-     SVG means they can never collide with the HUD or dock chrome. */
+  /* Decorative pixel spruce trees printed on the map's bottom
+     ocean corners, like illustrations on a game map. Living inside
+     the SVG means they can never collide with the HUD or dock chrome. */
   addMapTrees(svg);
   parts.labels = svgEl('g');
   GEO.features.forEach(function (f) {
@@ -563,7 +511,7 @@ function buildSvgView(svg, isMain) {
       ? project(LABEL_ANCHOR[f.code][0], LABEL_ANCHOR[f.code][1]) : null;
     var t = svgEl('text', { x: anchor ? anchor[0] : f.label.x,
       y: anchor ? anchor[1] : f.label.y, 'text-anchor': 'middle',
-      fill: '#6b4a26', 'paint-order': 'stroke', stroke: '#f4e7ba',
+      fill: '#1d3557', 'paint-order': 'stroke', stroke: '#ffffff',
       'stroke-linejoin': 'round', 'font-weight': 700, opacity: 0.9 });
     t.style.pointerEvents = 'none';
     t.textContent = f.code;
@@ -577,77 +525,37 @@ function buildSvgView(svg, isMain) {
      map only — renderMarkersInto leaves this empty for the poster). */
   parts.badges = svgEl('g'); svg.appendChild(parts.badges);
   if (isMain) { parts.temp = svgEl('g'); svg.appendChild(parts.temp); }
-  /* Scroll rolls (Minji, 2026-11-23): the sheet is a parchment
-     scroll unfurled on the table — its left and right edges wrap
-     around rolls of paper. Each roll: a shadow strip on the table,
-     a shadow strip on the parchment, a cylinder band lit by a
-     horizontal gradient, two faint paper-layer seams, and spiral
-     end caps. Presentation attributes only (poster-safe). */
-  var rollG = svgEl('g');
-  rollG.style.pointerEvents = 'none';
-  var rollM = 1.15;
-  var rollY0 = FULL.y - rollM - 0.05, rollY1 = FULL.y + FULL.h + rollM + 0.05;
-  var rollW = 2.0;
-  [FULL.x - rollM, FULL.x + FULL.w + rollM].forEach(function (xe) {
-    rollG.appendChild(svgEl('rect', { x: xe - 1.7, y: rollY0 - 0.3,
-      width: 0.9, height: (rollY1 - rollY0) + 0.6,
-      fill: 'url(#gradB-' + viewKey + ')', opacity: 0.5 }));
-    rollG.appendChild(svgEl('rect', { x: xe + 0.8, y: rollY0 - 0.3,
-      width: 0.9, height: (rollY1 - rollY0) + 0.6,
-      fill: 'url(#gradA-' + viewKey + ')', opacity: 0.5 }));
-    rollG.appendChild(svgEl('rect', { x: xe - rollW / 2, y: rollY0,
-      width: rollW, height: rollY1 - rollY0, rx: 0.16,
-      fill: 'url(#rollgrad-' + viewKey + ')', stroke: '#4a3319',
-      'stroke-width': 0.05, 'stroke-opacity': 0.6 }));
-    [0.30, 0.72].forEach(function (fx) {
-      rollG.appendChild(svgEl('rect', {
-        x: xe - rollW / 2 + rollW * fx, y: rollY0 + 0.15, width: 0.07,
-        height: (rollY1 - rollY0) - 0.3, fill: '#4a3319', opacity: 0.10 }));
-    });
-    [rollY0, rollY1].forEach(function (cy) {
-      rollG.appendChild(svgEl('ellipse', { cx: xe, cy: cy, rx: rollW / 2,
-        ry: rollW * 0.36, fill: 'url(#rollcap-' + viewKey + ')',
-        stroke: '#543d20', 'stroke-width': 0.05, 'stroke-opacity': 0.7 }));
-      rollG.appendChild(svgEl('ellipse', { cx: xe, cy: cy,
-        rx: rollW * 0.44, ry: rollW * 0.31, fill: 'none',
-        stroke: '#8a6a3f', 'stroke-width': 0.06, 'stroke-opacity': 0.75 }));
-      rollG.appendChild(svgEl('ellipse', { cx: xe, cy: cy,
-        rx: rollW * 0.31, ry: rollW * 0.225, fill: 'none',
-        stroke: '#7d5c2e', 'stroke-width': 0.07, 'stroke-opacity': 0.8 }));
-      rollG.appendChild(svgEl('ellipse', { cx: xe, cy: cy,
-        rx: rollW * 0.15, ry: rollW * 0.11, fill: '#8a6a3f',
-        stroke: '#543d20', 'stroke-width': 0.04, 'stroke-opacity': 0.7 }));
-    });
-  });
-  svg.appendChild(rollG);
+
   svg.setAttribute('viewBox', (FULL.x - SHEET_PAD) + ' ' +
     (FULL.y - SHEET_PAD) + ' ' + (FULL.w + SHEET_PAD * 2) + ' ' +
     (FULL.h + SHEET_PAD * 2));
   return parts;
 }
-/* ---------------- Pixel maple trees (map decoration) ----------------
-   One 14×15 pixel grid, two autumn palettes. Drawn with plain rects
-   inside the SVG, so the trees pan/zoom with the map like artwork
-   printed on it — and show up on the poster too. */
+/* ---------------- Pixel spruce trees (map decoration) ----------------
+   One 14×15 pixel grid, two winter palettes: deep spruce green
+   with white snow caps (winter reskin, Minji 2026-11-26 — these
+   were autumn maples before). Drawn with plain rects inside the
+   SVG, so the trees pan/zoom with the map like artwork printed
+   on it — and show up on the poster too. */
 var TREE_GRID = [
-  '.....YY.......',
-  '....YOOY......',
-  '...YOOOOY.....',
-  '..YOOOOOOY....',
-  '..ROOOOOR.....',
-  '.ROOOOOOOOR...',
-  '.ROoOOOOoOR...',
-  '.ROOOOOOOOR...',
-  '..ROOOOOOR....',
-  '...ROOOOR.....',
-  '....ROOR......',
+  '......WW......',
+  '.....WGGW.....',
+  '....WGGGGW....',
+  '...WGGGGGGW...',
+  '..DDWGGGGWDD..',
+  '..DDDDDDDDDD..',
+  '.DDDDdDDDDDDD.',
+  '.DDDDDDDDDDDD.',
+  '..DDDDDDDDDD..',
+  '...DDDDDDDD...',
+  '....DDDDDD....',
   '.....TT.......',
   '.....TT.......',
   '....TTTT......',
-  '..gggggggg....'
+  '..ssssssss....'
 ];
-var TREE_PALETTE_A = { Y:'#f2c230', O:'#e8862e', o:'#f5a83d', R:'#d94f4f', T:'#7a4a21', g:'#3e7d32' };
-var TREE_PALETTE_B = { Y:'#f2c230', O:'#d94f4f', o:'#ef6f3c', R:'#e8862e', T:'#7a4a21', g:'#3e7d32' };
+var TREE_PALETTE_A = { W:'#ffffff', G:'#2e7d46', D:'#1e5631', d:'#2e7d46', T:'#5b4632', s:'#eef6fb' };
+var TREE_PALETTE_B = { W:'#ffffff', G:'#3f9159', D:'#27653c', d:'#3f9159', T:'#5b4632', s:'#eef6fb' };
 function pixelTree(cell, palette) {
   var g = svgEl('g');
   TREE_GRID.forEach(function (row, ry) {
@@ -673,8 +581,8 @@ function addMapTrees(svg) {
     t.setAttribute('transform', 'translate(' + x + ' ' + (base - th) + ')');
     g.appendChild(t);
   }
-  /* Bottom-left: a big orange tree with a smaller red one beside it.
-     Bottom-right: one red tree. All three sit in open ocean corners. */
+  /* Bottom-left: a big spruce with a smaller one beside it.
+     Bottom-right: one spruce. All three sit in open ocean corners. */
   place(TREE_PALETTE_A, 0.088, FULL.x + FULL.w * 0.012, false);
   place(TREE_PALETTE_B, 0.06, FULL.x + FULL.w * 0.012 + FULL.h * 0.088 / TREE_GRID.length * 15.2, false);
   place(TREE_PALETTE_B, 0.074, FULL.x + FULL.w * 0.988, true);
@@ -832,74 +740,51 @@ function makePlaceholderArt() {
     return c.toDataURL('image/png');
   } catch (e) { return null; }
 }
-/* Outline of the parchment sheet: a rounded rectangle a little
-   larger than the map, its edge jittered with a fixed seed (so the
-   map and the poster tear identically) and smoothed into the wavy,
-   hand-torn silhouette of Minji's reference maps. */
-function sheetPathD() {
-  var m = 1.15;
+/* Outline of the winter panel (Minji, 2026-11-26): a clean
+   rounded rectangle a little larger than the land — the torn,
+   jittered parchment edge of the treasure-map era is gone. The
+   same path serves the map and the poster, so both frame
+   identically. */
+function panelPathD() {
+  var m = 0.85, r = 1.1;
   var x0 = FULL.x - m, y0 = FULL.y - m;
   var x1 = FULL.x + FULL.w + m, y1 = FULL.y + FULL.h + m;
-  var seed = 1234567;
-  function rnd() {
-    seed = (seed * 1103515245 + 12345) % 2147483648;
-    return seed / 2147483648;
-  }
-  var pts = [];
-  function edge(ax, ay, bx, by, nx, ny) {
-    var len = Math.hypot(bx - ax, by - ay);
-    var steps = Math.max(2, Math.round(len / 2.3));
-    for (var i = 0; i < steps; i++) {
-      var t = i / steps;
-      var j = (i === 0) ? 0 : (rnd() - 0.5) * 0.68;
-      pts.push([ax + (bx - ax) * t + nx * j, ay + (by - ay) * t + ny * j]);
-    }
-  }
-  edge(x0, y0, x1, y0, 0, -1); edge(x1, y0, x1, y1, 1, 0);
-  edge(x1, y1, x0, y1, 0, 1); edge(x0, y1, x0, y0, -1, 0);
-  var n = pts.length;
-  var d = 'M' + pts[0][0].toFixed(2) + ',' + pts[0][1].toFixed(2);
-  for (var i = 0; i < n; i++) {
-    var p0 = pts[(i - 1 + n) % n], p1 = pts[i];
-    var p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
-    d += 'C' + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(2) + ',' +
-      (p1[1] + (p2[1] - p0[1]) / 6).toFixed(2) + ' ' +
-      (p2[0] - (p3[0] - p1[0]) / 6).toFixed(2) + ',' +
-      (p2[1] - (p3[1] - p1[1]) / 6).toFixed(2) + ' ' +
-      p2[0].toFixed(2) + ',' + p2[1].toFixed(2);
-  }
-  return d + 'Z';
+  return 'M' + (x0 + r) + ',' + y0 +
+    'L' + (x1 - r) + ',' + y0 + 'Q' + x1 + ',' + y0 + ' ' + x1 + ',' + (y0 + r) +
+    'L' + x1 + ',' + (y1 - r) + 'Q' + x1 + ',' + y1 + ' ' + (x1 - r) + ',' + y1 +
+    'L' + (x0 + r) + ',' + y1 + 'Q' + x0 + ',' + y1 + ' ' + x0 + ',' + (y1 - r) +
+    'L' + x0 + ',' + (y0 + r) + 'Q' + x0 + ',' + y0 + ' ' + (x0 + r) + ',' + y0 + 'Z';
 }
-/* Compass rose printed on Hudson Bay, like the old maps in
-   Minji's reference photos: two ink rings, an eight-point star,
-   and a small N. Pure presentation attributes (poster-safe). */
+/* Compass rose printed on Hudson Bay: two slate rings, an
+   eight-point star with a red north point, and a small red N.
+   Pure presentation attributes (poster-safe). */
 function addCompassRose(svg) {
   var c = project(59.5, -86.0), cx = c[0], cy = c[1];
   var g = svgEl('g');
   g.style.pointerEvents = 'none';
   g.appendChild(svgEl('circle', { cx: cx, cy: cy, r: 2.05, fill: 'none',
-    stroke: '#543d20', 'stroke-width': 0.05, opacity: 0.6, 'data-sw': 0.05 }));
+    stroke: '#5b7d99', 'stroke-width': 0.05, opacity: 0.6, 'data-sw': 0.05 }));
   g.appendChild(svgEl('circle', { cx: cx, cy: cy, r: 1.78, fill: 'none',
-    stroke: '#543d20', 'stroke-width': 0.03, opacity: 0.45, 'data-sw': 0.03 }));
+    stroke: '#5b7d99', 'stroke-width': 0.03, opacity: 0.45, 'data-sw': 0.03 }));
   [90, 0, 180, 270, 45, 135, 225, 315].forEach(function (ang) {
     var ln = (ang % 90 === 0) ? 1.75 : 1.05;
     var r = ang * Math.PI / 180, r2 = (ang + 90) * Math.PI / 180;
     var x2 = cx + ln * Math.cos(r), y2 = cy - ln * Math.sin(r);
     var bx = cx + 0.3 * Math.cos(r2), by = cy - 0.3 * Math.sin(r2);
     g.appendChild(svgEl('path', { d: 'M' + cx + ',' + cy + 'L' + x2 + ',' + y2 +
-      'L' + bx + ',' + by + 'Z', fill: '#543d20', opacity: 0.8 }));
+      'L' + bx + ',' + by + 'Z', fill: (ang === 90 ? '#d80621' : '#5b7d99'), opacity: 0.8 }));
   });
-  g.appendChild(svgEl('circle', { cx: cx, cy: cy, r: 0.14, fill: '#543d20' }));
+  g.appendChild(svgEl('circle', { cx: cx, cy: cy, r: 0.14, fill: '#5b7d99' }));
   var t = svgEl('text', { x: cx, y: cy - 2.35, 'text-anchor': 'middle',
-    fill: '#543d20', 'font-size': 0.95 });
+    fill: '#d80621', 'font-size': 0.95 });
   t.textContent = 'N';
   g.appendChild(t);
   svg.appendChild(g);
 }
-/* The journey so far: a dashed ink-red route through the stamped
-   main/bonus parks in the order they were visited, the way
-   treasure maps draw the path to the X. Rebuilt on every render
-   (map and poster alike) from state, so it is never stale. */
+/* The journey so far: a dashed Canadian-red route through the
+   stamped main/bonus parks in the order they were visited.
+   Rebuilt on every render (map and poster alike) from state, so
+   it is never stale. */
 function renderRoute(parts) {
   if (!parts || !parts.route) return;
   var g = parts.route;
@@ -921,74 +806,51 @@ function renderRoute(parts) {
       ' ' + (p2[0] - (p3[0] - p1[0]) / 6) + ',' + (p2[1] - (p3[1] - p1[1]) / 6) +
       ' ' + p2[0] + ',' + p2[1];
   }
-  g.appendChild(svgEl('path', { d: d, fill: 'none', stroke: '#8a3b2a',
+  g.appendChild(svgEl('path', { d: d, fill: 'none', stroke: '#d80621',
     'stroke-width': 0.09, 'stroke-dasharray': '0.34 0.26',
     'stroke-linecap': 'round', opacity: 0.8,
     'data-sw': 0.09, 'data-sdash': '0.34 0.26' }));
   pts.forEach(function (pt) {
-    g.appendChild(svgEl('circle', { cx: pt[0], cy: pt[1], r: 0.11, fill: '#8a3b2a', 'data-r': 0.11 }));
+    g.appendChild(svgEl('circle', { cx: pt[0], cy: pt[1], r: 0.11, fill: '#d80621', 'data-r': 0.11 }));
   });
 }
-/* Treasure-chest park marker (Minji, 2026-11-13): an unopened
-   chest waits at every open quest; stamping the park springs it
-   open with the gold spilling out. Bonus chests wear extra gold.
-   Sized off the same radius the round stamps used, so the
-   declutter spacing math keeps working. */
+/* Maple-leaf park marker (winter reskin, Minji 2026-11-26 —
+   replaces the 2026-11-13 treasure chest): the flag's maple leaf
+   on a white disc. Unvisited: a pale red leaf. Visited: a full
+   Canadian-red leaf inside a red ring. Bonus (Rouge): a gold
+   leaf. The disc radius IS the marker radius s, so the declutter
+   spacing math keeps working, and the ring width rides on s
+   exactly as the chest's ink did — chestShrink keeps shrinking
+   the whole marker at deep zoom, so nothing blobs. */
 function sparklePath(cx, cy, r) {
   return 'M' + cx + ',' + (cy - r) + 'L' + (cx + r * 0.28) + ',' + (cy - r * 0.28) +
     'L' + (cx + r) + ',' + cy + 'L' + (cx + r * 0.28) + ',' + (cy + r * 0.28) +
     'L' + cx + ',' + (cy + r) + 'L' + (cx - r * 0.28) + ',' + (cy + r * 0.28) +
     'L' + (cx - r) + ',' + cy + 'L' + (cx - r * 0.28) + ',' + (cy - r * 0.28) + 'Z';
 }
-function chestMarker(x, y, s, opened, bonus) {
-  var ink = '#543d20', gold = bonus ? '#f7d774' : '#e8b23f';
-  var body = bonus ? '#96622e' : '#8a5a2b', lid = bonus ? '#b57e3a' : '#a9713f';
+function leafMarker(x, y, s, opened, bonus) {
+  var leafFill = bonus ? '#e8a812' : (opened ? '#d80621' : '#e8a7ad');
+  var ring = bonus ? '#c9932b' : (opened ? '#d80621' : '#c8ddef');
   var g = svgEl('g', { 'class': 'park-marker' });
-  /* Outline widths ride on s: as absolute units they stayed 0.09
-     wide while chestShrink shrank the chest itself, so at deep
-     zoom the ink swallowed the whole marker into a dark blob
-     (v15 live test). At the normal s~0.40 these equal the old
-     absolute widths. */
-  var inkW = Math.max(0.012, s * 0.22), inkW2 = Math.max(0.01, s * 0.17),
-      inkW3 = Math.max(0.008, s * 0.12), inkW4 = Math.max(0.009, s * 0.15);
+  /* Outline widths ride on s: as absolute units they stayed wide
+     while chestShrink shrank the marker itself, so at deep zoom
+     the outline swallowed the whole marker into a dark blob
+     (v15 live test). At the normal s~0.40 this equals the old
+     absolute width. */
+  var ringW = Math.max(0.012, s * 0.22);
   g.appendChild(svgEl('ellipse', { cx: x + s * 0.08, cy: y + s * 0.82,
-    rx: s * 1.02, ry: s * 0.22, fill: 'rgba(74,44,18,0.30)' }));
-  var lidD = 'M' + (x - s) + ',' + (y - s * 0.05) + 'L' + (x - s) + ',' + (y - s * 0.55) +
-    'Q' + x + ',' + (y - s * 1.08) + ' ' + (x + s) + ',' + (y - s * 0.55) +
-    'L' + (x + s) + ',' + (y - s * 0.05) + 'Z';
-  var bandD = 'M' + (x - s * 0.16) + ',' + (y - s * 0.05) + 'L' + (x - s * 0.16) + ',' + (y - s * 0.7) +
-    'Q' + x + ',' + (y - s * 0.9) + ' ' + (x + s * 0.16) + ',' + (y - s * 0.7) +
-    'L' + (x + s * 0.16) + ',' + (y - s * 0.05) + 'Z';
-  if (opened) {
-    var lidG = svgEl('g', { transform: 'rotate(-32 ' + (x - s) + ' ' + (y - s * 0.05) + ')' });
-    lidG.appendChild(svgEl('path', { d: lidD, fill: lid, stroke: ink, 'stroke-width': inkW, 'stroke-linejoin': 'round' }));
-    lidG.appendChild(svgEl('path', { d: bandD, fill: gold }));
-    g.appendChild(lidG);
-    g.appendChild(svgEl('rect', { x: x - s, y: y - s * 0.32, width: s * 2, height: s * 0.3,
-      fill: '#3a2410', stroke: ink, 'stroke-width': inkW2 }));
-    [[-0.45, -0.34, 0.17], [0.05, -0.42, 0.2], [0.5, -0.32, 0.16]].forEach(function (cn) {
-      g.appendChild(svgEl('circle', { cx: x + s * cn[0], cy: y + s * cn[1], r: s * cn[2],
-        fill: '#f7d774', stroke: '#c9932b', 'stroke-width': inkW3 }));
-    });
-  } else {
-    g.appendChild(svgEl('path', { d: lidD, fill: lid, stroke: ink, 'stroke-width': inkW, 'stroke-linejoin': 'round' }));
-    g.appendChild(svgEl('path', { d: bandD, fill: gold }));
-  }
-  g.appendChild(svgEl('rect', { x: x - s, y: y - s * 0.05, width: s * 2, height: s * 0.85,
-    fill: body, stroke: ink, 'stroke-width': inkW }));
-  g.appendChild(svgEl('rect', { x: x - s * 0.16, y: y - s * 0.05, width: s * 0.32, height: s * 0.85, fill: gold }));
-  if (bonus) {
-    [-0.68, 0.52].forEach(function (off) {
-      g.appendChild(svgEl('rect', { x: x + s * off, y: y - s * 0.05, width: s * 0.14, height: s * 0.85, fill: gold }));
-    });
-  }
-  g.appendChild(svgEl('rect', { x: x - s * 0.17, y: y - s * 0.26, width: s * 0.34, height: s * 0.42,
-    fill: gold, stroke: ink, 'stroke-width': inkW4 }));
-  if (!opened) {
-    g.appendChild(svgEl('circle', { cx: x, cy: y + s * 0.02, r: s * 0.055, fill: ink }));
-  } else {
-    g.appendChild(svgEl('path', { d: sparklePath(x + s * 0.66, y - s * 0.78, s * 0.17), fill: '#fff6d8' }));
-    g.appendChild(svgEl('path', { d: sparklePath(x - s * 0.72, y - s * 0.6, s * 0.12), fill: '#fff6d8' }));
+    rx: s * 1.02, ry: s * 0.22, fill: 'rgba(15,42,74,0.25)' }));
+  g.appendChild(svgEl('circle', { cx: x, cy: y, r: s,
+    fill: '#ffffff', stroke: ring, 'stroke-width': ringW }));
+  var lw = s * 1.5;
+  var leaf = svgEl('path', { d: LEAF_PATH, fill: leafFill,
+    transform: 'translate(' + (x - lw / 2) + ' ' + (y - lw / 2) +
+      ') scale(' + (lw / 100) + ')' });
+  leaf.style.pointerEvents = 'none';
+  g.appendChild(leaf);
+  if (opened && !bonus) {
+    g.appendChild(svgEl('path', { d: sparklePath(x + s * 0.78, y - s * 0.72, s * 0.17), fill: '#ffd9de' }));
+    g.appendChild(svgEl('path', { d: sparklePath(x - s * 0.8, y - s * 0.55, s * 0.12), fill: '#ffd9de' }));
   }
   var hit = svgEl('circle', { cx: x, cy: y, r: s * 1.8 + 0.15, 'class': 'hit' });
   g.appendChild(hit);
@@ -1006,14 +868,14 @@ function renderPhotoFills(parts) {
       return p.province === code && p.tier !== 'side';
     });
     /* Empty cells: no fill at all — the slot is traced by one
-       thin sepia seam, like a region pencilled onto an old map,
-       waiting to be filled. Never a card floating on the map. */
+       thin pale-slate seam, waiting to be filled. Never a card
+       floating on the map. */
     parks.forEach(function (park) {
       var cell = CELLS[park.id];
       if (!cell) return;
       g.appendChild(svgEl('path', { d: cellPathD(cell),
         fill: 'none',
-        stroke: 'rgba(110,79,42,0.55)', 'stroke-width': 0.05,
+        stroke: 'rgba(185,210,228,0.9)', 'stroke-width': 0.05,
         'stroke-linejoin': 'round', 'data-sw': 0.05 }));
     });
     /* Filled cells: the photo, cover-fit over the cell's bbox and
@@ -1031,12 +893,15 @@ function renderPhotoFills(parts) {
       setImageHref(img, url);
       cg.appendChild(img);
       g.appendChild(cg);
-      /* One ink edge, like a picture pasted into an old atlas,
-         so a filled piece reads 뚜렷하게 against both its photo
-         neighbours and the empty parchment land. */
+      /* A white edge with a soft slate halo, so a filled piece
+         reads 뚜렷하게 against both its photo neighbours and the
+         empty snowy land. */
       g.appendChild(svgEl('path', { d: cellPathD(cell), fill: 'none',
-        stroke: 'rgba(84,61,32,0.85)', 'stroke-width': 0.07,
+        stroke: '#ffffff', 'stroke-width': 0.07,
         'stroke-linejoin': 'round', 'data-sw': 0.07 }));
+      g.appendChild(svgEl('path', { d: cellPathD(cell), fill: 'none',
+        stroke: 'rgba(91,125,153,0.55)', 'stroke-width': 0.16,
+        'stroke-linejoin': 'round', 'data-sw': 0.16 }));
     });
   });
 }
@@ -1060,13 +925,13 @@ function mainMarkerRadius(zoom, interactive) {
   if (interactive && focusCode) s *= 1.12;
   return Math.min(s, (FULL.w / zoom) * 0.052);
 }
-/* Chests shrink as you zoom in (Minji, 2026-11-19, the marker half
+/* Markers shrink as you zoom in (Minji, 2026-11-19, the marker half
    of "lines get thinner when I zoom"): past the cap above, a
-   chest's screen size stays flat, so at 40x it would sit on top of
+   marker's screen size stays flat, so at 40x it would sit on top of
    the photo cell the user zoomed in to see. Anchored at zoom 3 so
    the normal browse range (phone home framing, province focus)
    looks exactly as before; deeper zooms fall to about x0.40 at
-   the 40x floor, never below x0.35 — a chest must stay tappable
+   the 40x floor, never below x0.35 — a marker must stay tappable
    and recognisable. */
 function chestShrink(zoom) {
   return Math.max(0.32, Math.pow(Math.max(zoom / 3, 1), -0.45));
@@ -1270,9 +1135,9 @@ function renderMarkersInto(parts, interactive, viewW) {
       g = circleMarker(it.x, it.y, it.s,
         visit ? 'mk-done-side' : 'mk-open-side', visit ? '★' : '?', 1.0);
     } else if (visit) {
-      g = chestMarker(it.x, it.y, it.s, true, bonus);
+      g = leafMarker(it.x, it.y, it.s, true, bonus);
     } else {
-      g = chestMarker(it.x, it.y, it.s, false, bonus);
+      g = leafMarker(it.x, it.y, it.s, false, bonus);
     }
     if (interactive) {
       (function (pk) {
@@ -1309,7 +1174,7 @@ function renderMarkersInto(parts, interactive, viewW) {
     if (camp.photo) {
       g = photoMarker(xy[0], xy[1], s, camp.photo, 'mk-photo');
       g.setAttribute('class', 'camp-marker');
-      g.querySelector('.mk-photo').setAttribute('style', 'stroke:#3e7d32');
+      g.querySelector('.mk-photo').setAttribute('style', 'stroke:#2e7d46');
     } else {
       g = squareMarker(xy[0], xy[1], s, 'mk-camp', '⛺', 0.95);
       g.setAttribute('class', 'camp-marker');
@@ -1346,8 +1211,8 @@ function renderMap() {
 function stageRect() { return mapSvg.getBoundingClientRect(); }
 function fitWidth() {
   var r = stageRect();
-  /* The frame includes the parchment sheet and its scroll rolls,
-     so zooming all the way out shows the whole unfurled map. */
+  /* The frame includes the winter panel and its margin, so
+     zooming all the way out shows the whole map. */
   return Math.max(FULL.w + SHEET_PAD * 2,
     (FULL.h + SHEET_PAD * 2 + 1.6) * (r.width / Math.max(r.height, 1)));
 }
@@ -1812,7 +1677,11 @@ function saveSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
   catch (e) { /* ignore */ }
 }
-var LEAF_COLORS = ['#d94f4f', '#e2543e', '#e8862e', '#f09a3e', '#f2c230', '#c93b3b'];
+/* Winter reskin (Minji, 2026-11-26): the falling maple leaves
+   became falling snow — plain white flakes. The settings key,
+   the toggle and the function names keep their "leaves" names;
+   only what falls changed. */
+var LEAF_COLORS = ['#ffffff'];
 var LEAF_PATH = 'M49.4 1 L40.5 16.6 L34 15.3 L33.9 35.6 L21 25.6 L3.5 24.1 ' +
   'L8.5 42.8 L2.8 46.8 L16.7 59.8 L2.2 69.9 L17.4 77.6 L29.3 77.1 L29.7 86.2 ' +
   'L48.4 71.6 L48.4 98 L52 98 L52 71.4 L70.5 85.4 L70 76.8 L82.6 76.7 ' +
@@ -1820,7 +1689,7 @@ var LEAF_PATH = 'M49.4 1 L40.5 16.6 L34 15.3 L33.9 35.6 L21 25.6 L3.5 24.1 ' +
   'L65.6 14.7 L59.1 15.3 Z';
 function leafSvg(color, size) {
   return '<svg viewBox="0 0 100 100" width="' + size + '" height="' + size +
-    '" aria-hidden="true"><path d="' + LEAF_PATH + '" fill="' + color + '"/></svg>';
+    '" aria-hidden="true"><circle cx="50" cy="50" r="34" fill="' + color + '"/></svg>';
 }
 function leavesActive() { return settings.leaves && !REDUCED_MOTION; }
 function buildLeaves() {
@@ -2267,20 +2136,20 @@ function savePosterPng() {
     var canvas = document.createElement('canvas');
     canvas.width = cw; canvas.height = ch;
     var ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#fffaf0';
+    ctx.fillStyle = '#f4f9fd';
     ctx.fillRect(0, 0, cw, ch);
-    ctx.strokeStyle = '#5b3a1e'; ctx.lineWidth = 12 * PS;
+    ctx.strokeStyle = '#1d3557'; ctx.lineWidth = 12 * PS;
     ctx.strokeRect(18 * PS, 18 * PS, cw - 36 * PS, ch - 36 * PS);
-    ctx.strokeStyle = '#c98d4e'; ctx.lineWidth = 4 * PS;
+    ctx.strokeStyle = '#4a90c2'; ctx.lineWidth = 4 * PS;
     ctx.strokeRect(42 * PS, 42 * PS, cw - 84 * PS, ch - 84 * PS);
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#b4552d';
+    ctx.fillStyle = '#4a90c2';
     ctx.font = (28 * PS) + 'px ' + pxFont;
     ctx.fillText('CANADA PARKS QUEST', cw / 2, 118 * PS);
-    ctx.fillStyle = '#4a3f35';
+    ctx.fillStyle = '#1d3557';
     ctx.font = '800 ' + (58 * PS) + 'px ' + roundFont;
     ctx.fillText('Every park, one stamp at a time', cw / 2, 196 * PS);
-    ctx.fillStyle = '#d94f4f';
+    ctx.fillStyle = '#d80621';
     ctx.font = (52 * PS) + 'px ' + pxFont;
     ctx.fillText(n + ' / 48', cw / 2, 282 * PS);
     var boxW = 1620 * PS, boxH = 860 * PS, boxY = 320 * PS;
@@ -2292,14 +2161,14 @@ function savePosterPng() {
       return 'Side · ' + set.label + ' ' + setCleared(set) + '/' + set.parks.length;
     }).join('    ');
     small += '     ⭐ Bonus ' + bonusCleared() + '/' + PARKS_BONUS.length;
-    ctx.fillStyle = '#4a3f35';
+    ctx.fillStyle = '#1d3557';
     ctx.font = '800 ' + (34 * PS) + 'px ' + roundFont;
     ctx.fillText('Explorer Lv.' + levelFor(n) + '     ' + small +
       '     ⛺ My Spots ' + state.camps.length, cw / 2, 1252 * PS);
-    ctx.fillStyle = '#4a3f35';
+    ctx.fillStyle = '#1d3557';
     ctx.font = '400 ' + (25 * PS) + 'px ' + roundFont;
     lines.forEach(function (ln, i) { ctx.fillText(ln, cw / 2, (1310 + i * 38) * PS); });
-    ctx.fillStyle = '#a08b74';
+    ctx.fillStyle = '#7d99b4';
     ctx.font = '400 ' + (25 * PS) + 'px ' + roundFont;
     ctx.fillText('🏕️ Made with our own two feet — from coast to coast to coast.',
       cw / 2, (1310 + lines.length * 38 + 44) * PS);

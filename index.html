@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>MaplePins — Canada Parks Quest</title>
 <meta name="description" content="A stamp-rally game across Canada's 48 national parks & reserves. Visit a park, stamp it with your photo, level up, fill the map.">
-<meta name="theme-color" content="#7a4a21">
+<meta name="theme-color" content="#0f2a4a">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏕️</text></svg>">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -23,11 +23,11 @@
 
 <!-- ======================= Main stage: framed map + game HUD ======================= -->
 <main id="stage">
-  <!-- The illustrated map, wrapped in a wooden pixel frame like an in-game map item -->
+  <!-- The illustrated map, wrapped in a pixel frame like an in-game map item -->
   <div id="mapFrame">
     <svg id="mapSvg" xmlns:xlink="http://www.w3.org/1999/xlink" preserveAspectRatio="xMidYMid meet" role="img"
          aria-label="Illustrated map of Canada with all 48 national parks & reserves — tap a province to zoom in, tap a park marker to open its quest card"></svg>
-    <!-- Falling maple leaves: ambient layer clipped to the frame, never intercepts taps -->
+    <!-- Falling snow: ambient layer clipped to the frame, never intercepts taps -->
     <div id="leafLayer" aria-hidden="true"></div>
   </div>
 
