@@ -397,7 +397,7 @@ function provFillOpacity(code) { return 0.55 + 0.45 * provRatio(code); }
 function buildSvgView(svg, isMain) {
   var viewKey = isMain ? 'm' : 'p';
   var parts = { paths:{}, labels:null, markers:null, badges:null,
-    labelEls:{}, fillGroups:{}, outlines:{}, glow:{}, route:null, rays:null, viewKey: viewKey };
+    labelEls:{}, fillGroups:{}, fitLayer:null, outlines:{}, glow:{}, route:null, rays:null, viewKey: viewKey };
   /* Clips: one per province (its outline) and one per park cell.
      Ids are prefixed per view so map and poster never collide. */
   var defs = svgEl('defs');
@@ -476,6 +476,18 @@ function buildSvgView(svg, isMain) {
     parts.fillGroups[f.code] = g;
     gFills.appendChild(g);
   });
+  /* Fitted-photo layer (see renderPhotoFills): fit-mode photo
+     groups live here, clipped ONLY by their cell — never by the
+     province outline. Offshore cells (Pituamkek, a barrier-island
+     chain whose Voronoi cell is mostly Gulf water) would
+     otherwise have the placed photo all but erased by the land
+     clip. Appended just under the fills layer, so cell seams and
+     the filled-cell edge strokes still draw over the fitted
+     backdrop, and route/markers stay above everything. */
+  var gFit = svgEl('g');
+  gFit.style.pointerEvents = 'none';
+  parts.fitLayer = gFit;
+  svg.appendChild(gFit);
   svg.appendChild(gFills);
 
   /* Coastline ink (winter palette, Minji 2026-11-26; the layer
@@ -965,6 +977,9 @@ function rectInCell(cell, x, y, w, h) {
    fills survive the poster's SVG serialization byte-for-byte. */
 function renderPhotoFills(parts) {
   if (!parts || !parts.fillGroups) return;
+  if (parts.fitLayer) {
+    while (parts.fitLayer.firstChild) parts.fitLayer.removeChild(parts.fitLayer.firstChild);
+  }
   Object.keys(parts.fillGroups).forEach(function (code) {
     var g = parts.fillGroups[code];
     while (g.firstChild) g.removeChild(g.firstChild);
@@ -994,7 +1009,8 @@ function renderPhotoFills(parts) {
       if (!url) return;
       var cg = svgEl('g', { 'clip-path': 'url(#cellclip-' + parts.viewKey + '-' + park.id + ')' });
       var bw = cell.x1 - cell.x0, bh = cell.y1 - cell.y0;
-      if (photoFitMode(cell, url) === 'fit') {
+      var fitMode = photoFitMode(cell, url) === 'fit';
+      if (fitMode) {
         /* Backdrop: the same photo cover-fit, blurred and washed
            pale, so the cell still reads as filled land. */
         var bg = svgEl('image', { x: cell.x0, y: cell.y0,
@@ -1044,7 +1060,20 @@ function renderPhotoFills(parts) {
         setImageHref(img, url);
         cg.appendChild(img);
       }
-      g.appendChild(cg);
+      /* Fit groups move OUT of the province-clipped group into
+         the fit layer: the province outline clip would erase
+         most of a placed photo whose cell reaches offshore
+         (Pituamkek's cell is ~93% Gulf water — live, only the
+         photo's bottom-right corner survived on the land sliver).
+         The cell clip alone bounds the photo, exactly as the
+         isolated-cell renders always assumed. Cover cells stay
+         in the province group, unchanged. */
+      if (fitMode && parts.fitLayer) {
+        cg.setAttribute('data-province', code);
+        parts.fitLayer.appendChild(cg);
+      } else {
+        g.appendChild(cg);
+      }
       /* A white edge with a soft slate halo, so a filled piece
          reads 뚜렷하게 against both its photo neighbours and the
          empty snowy land. */
@@ -1479,6 +1508,11 @@ function refreshFocusUI() {
     Object.keys(mapParts.fillGroups).forEach(function (code) {
       mapParts.fillGroups[code].style.opacity = (!focusCode || focusCode === code) ? '' : '0.45';
     });
+    if (mapParts.fitLayer) {
+      Array.prototype.forEach.call(mapParts.fitLayer.childNodes, function (cg) {
+        cg.style.opacity = (!focusCode || focusCode === cg.getAttribute('data-province')) ? '' : '0.45';
+      });
+    }
     Object.keys(mapParts.outlines).forEach(function (code) {
       mapParts.outlines[code].style.opacity = (!focusCode || focusCode === code) ? '' : '0.45';
     });
