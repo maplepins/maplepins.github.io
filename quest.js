@@ -9,15 +9,16 @@
       official 48, so it never counts toward the counter or levels.
    3) SIDE QUESTS — curated famous provincial parks, one set per
       province (Ontario set ships now). Own markers, own counters.
-   4) MY SPOTS — free personal campsite pins (tent markers).
-      Never counted; stored separately from quest visits.
+   (A fourth layer, MY SPOTS free campsite pins, was removed on
+   2026-11-26 at Minji's call — the quest layers carry the app.
+   Old saves may still carry a camps array; it is ignored.)
    The map's land is divided into one stained-glass cell per
    main/bonus park: the Voronoi piece of its province that is
    closer to that park than to any sibling park, clipped to the
    province outline. Clearing a park fills ONLY its own cell
    with its photo — fill every cell and the whole map becomes
-   your photos, in the shape of Canada. Side quests and
-   campsites own no cells; they stay markers.
+   your photos, in the shape of Canada. Side quests own no
+   cells; they stay markers.
    Photos are downscaled to ~800px and kept as data URLs in
    localStorage for this demo. In production they belong in
    Supabase Storage, with only the file URL kept in the database.
@@ -49,54 +50,54 @@ var KIND_LABEL = { park:'National Park', reserve:'National Park Reserve',
    (north Labrador, est. 2008) are two DIFFERENT parks — both stay.
    Pituamkek NPR (PE, est. Jul 2024) is included at 46.611, -63.785. */
 var PARKS_MAIN = [
-  { id:'akami-uapishku', name:'Akami-Uapishkᵁ-KakKasuak-Mealy Mountains', kind:'reserve', tier:'main', province:'NL', lat:53.400, lng:-59.367, blurb:'Rounded Mealy Mountains and wild Labrador Sea beaches.' },
-  { id:'aulavik', name:'Aulavik', kind:'park', tier:'main', province:'NT', lat:73.700, lng:-119.917, blurb:'Treeless polar desert on Banks Island, home to muskoxen and Peary caribou.' },
-  { id:'auyuittuq', name:'Auyuittuq', kind:'park', tier:'main', province:'NU', lat:67.883, lng:-65.017, blurb:'Arctic fjords and towering peaks on Baffin Island.' },
-  { id:'banff', name:'Banff', kind:'park', tier:'main', province:'AB', lat:51.500, lng:-116.000, blurb:"Canada's first national park — turquoise lakes and the Valley of the Ten Peaks." },
-  { id:'bruce-peninsula', name:'Bruce Peninsula', kind:'park', tier:'main', province:'ON', lat:45.233, lng:-81.617, blurb:'Turquoise Grotto waters and Niagara Escarpment cliffs.' },
-  { id:'cape-breton-highlands', name:'Cape Breton Highlands', kind:'park', tier:'main', province:'NS', lat:46.717, lng:-60.667, blurb:'The Cabot Trail winds through Acadian highlands by the sea.' },
-  { id:'elk-island', name:'Elk Island', kind:'park', tier:'main', province:'AB', lat:53.617, lng:-112.867, blurb:'Bison herds and dark skies just east of Edmonton.' },
-  { id:'forillon', name:'Forillon', kind:'park', tier:'main', province:'QC', lat:48.900, lng:-64.350, blurb:'Sea cliffs at the very tip of the Gaspé Peninsula.' },
-  { id:'fundy', name:'Fundy', kind:'park', tier:'main', province:'NB', lat:45.600, lng:-64.950, blurb:"The world's highest tides — walk the ocean floor at low tide." },
-  { id:'georgian-bay-islands', name:'Georgian Bay Islands', kind:'park', tier:'main', province:'ON', lat:44.883, lng:-79.867, blurb:'Granite islands and windswept pines on Georgian Bay.' },
-  { id:'glacier', name:'Glacier', kind:'park', tier:'main', province:'BC', lat:51.300, lng:-117.517, blurb:'Rogers Pass, steep valleys and big Interior rainforest.' },
-  { id:'grasslands', name:'Grasslands', kind:'park', tier:'main', province:'SK', lat:49.200, lng:-107.717, blurb:'Endless mixed-grass prairie, bison and dinosaur country.' },
-  { id:'gros-morne', name:'Gros Morne', kind:'park', tier:'main', province:'NL', lat:49.683, lng:-57.733, blurb:"Ancient fjords and Earth's exposed mantle — a UNESCO site." },
-  { id:'gulf-islands', name:'Gulf Islands', kind:'reserve', tier:'main', province:'BC', lat:48.850, lng:-123.450, blurb:'Sunny little islets scattered in the Strait of Georgia.' },
-  { id:'gwaii-haanas', name:'Gwaii Haanas', kind:'reserve', tier:'main', province:'BC', lat:52.383, lng:-131.467, blurb:"Haida heritage sites and lush islands at Canada's west edge." },
-  { id:'ivvavik', name:'Ivvavik', kind:'park', tier:'main', province:'YT', lat:69.517, lng:-139.517, blurb:"Arctic tundra and the Firth River, Canada's oldest river." },
-  { id:'jasper', name:'Jasper', kind:'park', tier:'main', province:'AB', lat:52.800, lng:-117.900, blurb:'Dark-sky preserve of icefields, canyons and Maligne Lake.' },
-  { id:'kejimkujik', name:'Kejimkujik', kind:'park', tier:'main', province:'NS', lat:44.400, lng:-65.217, blurb:"Mi'kmaw cultural landscape of lakes, rivers and petroglyphs." },
-  { id:'kluane', name:'Kluane', kind:'reserve', tier:'main', province:'YT', lat:60.617, lng:-138.333, blurb:"Mount Logan and the world's largest non-polar icefield. (National Park and Reserve.)" },
-  { id:'kootenay', name:'Kootenay', kind:'park', tier:'main', province:'BC', lat:50.883, lng:-116.050, blurb:'Radium Hot Springs and the Rockwall trail in the Rockies.' },
-  { id:'kouchibouguac', name:'Kouchibouguac', kind:'park', tier:'main', province:'NB', lat:46.850, lng:-64.967, blurb:'Warm lagoons, dunes and salt marshes on the Acadian coast.' },
-  { id:'la-mauricie', name:'La Mauricie', kind:'park', tier:'main', province:'QC', lat:46.800, lng:-72.967, blurb:'Canoe-camping country of Laurentian lakes and forest.' },
-  { id:'mingan-archipelago', name:'Mingan Archipelago', kind:'reserve', tier:'main', province:'QC', lat:50.217, lng:-63.167, blurb:'Limestone monoliths and puffin colonies in the Gulf of St. Lawrence.' },
-  { id:'mount-revelstoke', name:'Mount Revelstoke', kind:'park', tier:'main', province:'BC', lat:51.083, lng:-118.067, blurb:'A summit drive through rainforest to alpine meadows.' },
-  { id:'naatsihchoh', name:"Nááts'įhch'oh", kind:'reserve', tier:'main', province:'NT', lat:62.367, lng:-127.967, blurb:'Moose Ponds and the headwaters of the South Nahanni River.' },
-  { id:'nahanni', name:'Nahanni', kind:'reserve', tier:'main', province:'NT', lat:61.550, lng:-125.583, blurb:'Virginia Falls and the legendary South Nahanni River.' },
-  { id:'pacific-rim', name:'Pacific Rim', kind:'reserve', tier:'main', province:'BC', lat:48.633, lng:-124.767, blurb:'Long Beach surf and the West Coast Trail rainforest.' },
-  { id:'pituamkek', name:'Pituamkek', kind:'reserve', tier:'main', province:'PE', lat:46.611, lng:-63.785, blurb:"A 50 km chain of barrier islands off PEI — a Mi'kmaq homeland of dunes and piping plovers." },
-  { id:'point-pelee', name:'Point Pelee', kind:'park', tier:'main', province:'ON', lat:41.967, lng:-82.517, blurb:"Canada's southernmost mainland — a spring birding magnet." },
-  { id:'prince-albert', name:'Prince Albert', kind:'park', tier:'main', province:'SK', lat:53.967, lng:-106.367, blurb:"Boreal forest, Waskesiu Lake and Grey Owl's cabin." },
-  { id:'prince-edward-island', name:'Prince Edward Island', kind:'park', tier:'main', province:'PE', lat:46.417, lng:-63.083, blurb:'Red sandstone cliffs and the Green Gables shore.' },
-  { id:'pukaskwa', name:'Pukaskwa', kind:'park', tier:'main', province:'ON', lat:48.250, lng:-85.883, blurb:'The wildest shoreline on the Great Lakes.' },
-  { id:'qausuittuq', name:'Qausuittuq', kind:'park', tier:'main', province:'NU', lat:76.000, lng:-100.000, blurb:'High Arctic refuge for Peary caribou on Bathurst Island.' },
-  { id:'quttinirpaaq', name:'Quttinirpaaq', kind:'park', tier:'main', province:'NU', lat:82.217, lng:-72.217, blurb:"Canada's northernmost park — Lake Hazen and polar desert." },
-  { id:'riding-mountain', name:'Riding Mountain', kind:'park', tier:'main', province:'MB', lat:50.867, lng:-100.033, blurb:'Boreal forest and bison above the Manitoba prairie.' },
-  { id:'sable-island', name:'Sable Island', kind:'reserve', tier:'main', province:'NS', lat:43.950, lng:-59.917, blurb:'A crescent of sand famous for its wild horses.' },
-  { id:'sirmilik', name:'Sirmilik', kind:'park', tier:'main', province:'NU', lat:72.983, lng:-81.133, blurb:'Glaciers, hoodoos and narwhal waters off Bylot Island.' },
-  { id:'terra-nova', name:'Terra Nova', kind:'park', tier:'main', province:'NL', lat:48.533, lng:-53.933, blurb:"Rocky coves and boreal forest on Newfoundland's east coast." },
-  { id:'thaidene-nene', name:'Thaidene Nëné', kind:'reserve', tier:'main', province:'NT', lat:62.500, lng:-111.000, blurb:"Land of the Ancestors — Great Slave Lake's East Arm." },
-  { id:'thousand-islands', name:'Thousand Islands', kind:'park', tier:'main', province:'ON', lat:44.350, lng:-75.950, blurb:'Granite islands scattered along the St. Lawrence River.' },
-  { id:'torngat-mountains', name:'Torngat Mountains', kind:'park', tier:'main', province:'NL', lat:59.433, lng:-63.867, blurb:"Labrador's highest peaks and Inuit ancestral lands." },
-  { id:'tuktut-nogait', name:'Tuktut Nogait', kind:'park', tier:'main', province:'NT', lat:68.817, lng:-121.750, blurb:'Tundra canyons protecting the Bluenose caribou herd.' },
-  { id:'ukkusiksalik', name:'Ukkusiksalik', kind:'park', tier:'main', province:'NU', lat:65.350, lng:-87.300, blurb:'Wager Bay — polar bear country and Thule relics.' },
-  { id:'vuntut', name:'Vuntut', kind:'park', tier:'main', province:'YT', lat:68.367, lng:-139.850, blurb:'Unglaciated Yukon plains travelled by the Porcupine caribou herd.' },
-  { id:'wapusk', name:'Wapusk', kind:'park', tier:'main', province:'MB', lat:57.767, lng:-93.367, blurb:'Polar bear maternity dens by Hudson Bay.' },
-  { id:'waterton-lakes', name:'Waterton Lakes', kind:'park', tier:'main', province:'AB', lat:49.050, lng:-113.917, blurb:'Where the prairie meets the Rockies — an International Peace Park.' },
-  { id:'wood-buffalo', name:'Wood Buffalo', kind:'park', tier:'main', province:'AB', lat:59.383, lng:-112.983, blurb:"Canada's largest park — wood bison and whooping cranes. (Spans AB / NT.)" },
-  { id:'yoho', name:'Yoho', kind:'park', tier:'main', province:'BC', lat:51.400, lng:-116.483, blurb:'Takakkaw Falls, Emerald Lake and Burgess Shale fossils.' }
+  { id:'akami-uapishku', name:'Akami-Uapishkᵁ-KakKasuak-Mealy Mountains', kind:'reserve', tier:'main', province:'NL', lat:53.400, lng:-59.367, blurb:'Rounded Mealy Mountains and wild Labrador Sea beaches.', addr:"Mary's Harbour, Newfoundland and Labrador" },
+  { id:'aulavik', name:'Aulavik', kind:'park', tier:'main', province:'NT', lat:73.700, lng:-119.917, blurb:'Treeless polar desert on Banks Island, home to muskoxen and Peary caribou.', addr:'Sachs Harbour, Northwest Territories' },
+  { id:'auyuittuq', name:'Auyuittuq', kind:'park', tier:'main', province:'NU', lat:67.883, lng:-65.017, blurb:'Arctic fjords and towering peaks on Baffin Island.', addr:'Pangnirtung, Nunavut' },
+  { id:'banff', name:'Banff', kind:'park', tier:'main', province:'AB', lat:51.500, lng:-116.000, blurb:"Canada's first national park — turquoise lakes and the Valley of the Ten Peaks.", addr:'Banff, Alberta' },
+  { id:'bruce-peninsula', name:'Bruce Peninsula', kind:'park', tier:'main', province:'ON', lat:45.233, lng:-81.617, blurb:'Turquoise Grotto waters and Niagara Escarpment cliffs.', addr:'Tobermory, Ontario' },
+  { id:'cape-breton-highlands', name:'Cape Breton Highlands', kind:'park', tier:'main', province:'NS', lat:46.717, lng:-60.667, blurb:'The Cabot Trail winds through Acadian highlands by the sea.', addr:'Ingonish, Nova Scotia' },
+  { id:'elk-island', name:'Elk Island', kind:'park', tier:'main', province:'AB', lat:53.617, lng:-112.867, blurb:'Bison herds and dark skies just east of Edmonton.', addr:'Fort Saskatchewan, Alberta' },
+  { id:'forillon', name:'Forillon', kind:'park', tier:'main', province:'QC', lat:48.900, lng:-64.350, blurb:'Sea cliffs at the very tip of the Gaspé Peninsula.', addr:'Gaspé, Quebec' },
+  { id:'fundy', name:'Fundy', kind:'park', tier:'main', province:'NB', lat:45.600, lng:-64.950, blurb:"The world's highest tides — walk the ocean floor at low tide.", addr:'Alma, New Brunswick' },
+  { id:'georgian-bay-islands', name:'Georgian Bay Islands', kind:'park', tier:'main', province:'ON', lat:44.883, lng:-79.867, blurb:'Granite islands and windswept pines on Georgian Bay.', addr:'Honey Harbour, Ontario' },
+  { id:'glacier', name:'Glacier', kind:'park', tier:'main', province:'BC', lat:51.300, lng:-117.517, blurb:'Rogers Pass, steep valleys and big Interior rainforest.', addr:'Rogers Pass, British Columbia' },
+  { id:'grasslands', name:'Grasslands', kind:'park', tier:'main', province:'SK', lat:49.200, lng:-107.717, blurb:'Endless mixed-grass prairie, bison and dinosaur country.', addr:'Val Marie, Saskatchewan' },
+  { id:'gros-morne', name:'Gros Morne', kind:'park', tier:'main', province:'NL', lat:49.683, lng:-57.733, blurb:"Ancient fjords and Earth's exposed mantle — a UNESCO site.", addr:'Rocky Harbour, Newfoundland and Labrador' },
+  { id:'gulf-islands', name:'Gulf Islands', kind:'reserve', tier:'main', province:'BC', lat:48.850, lng:-123.450, blurb:'Sunny little islets scattered in the Strait of Georgia.', addr:'Sidney, British Columbia' },
+  { id:'gwaii-haanas', name:'Gwaii Haanas', kind:'reserve', tier:'main', province:'BC', lat:52.383, lng:-131.467, blurb:"Haida heritage sites and lush islands at Canada's west edge.", addr:'Sandspit, British Columbia' },
+  { id:'ivvavik', name:'Ivvavik', kind:'park', tier:'main', province:'YT', lat:69.517, lng:-139.517, blurb:"Arctic tundra and the Firth River, Canada's oldest river.", addr:'Inuvik, Northwest Territories' },
+  { id:'jasper', name:'Jasper', kind:'park', tier:'main', province:'AB', lat:52.800, lng:-117.900, blurb:'Dark-sky preserve of icefields, canyons and Maligne Lake.', addr:'Jasper, Alberta' },
+  { id:'kejimkujik', name:'Kejimkujik', kind:'park', tier:'main', province:'NS', lat:44.400, lng:-65.217, blurb:"Mi'kmaw cultural landscape of lakes, rivers and petroglyphs.", addr:'Maitland Bridge, Nova Scotia' },
+  { id:'kluane', name:'Kluane', kind:'reserve', tier:'main', province:'YT', lat:60.617, lng:-138.333, blurb:"Mount Logan and the world's largest non-polar icefield. (National Park and Reserve.)", addr:'Haines Junction, Yukon' },
+  { id:'kootenay', name:'Kootenay', kind:'park', tier:'main', province:'BC', lat:50.883, lng:-116.050, blurb:'Radium Hot Springs and the Rockwall trail in the Rockies.', addr:'Radium Hot Springs, British Columbia' },
+  { id:'kouchibouguac', name:'Kouchibouguac', kind:'park', tier:'main', province:'NB', lat:46.850, lng:-64.967, blurb:'Warm lagoons, dunes and salt marshes on the Acadian coast.', addr:'Richibucto, New Brunswick' },
+  { id:'la-mauricie', name:'La Mauricie', kind:'park', tier:'main', province:'QC', lat:46.800, lng:-72.967, blurb:'Canoe-camping country of Laurentian lakes and forest.', addr:'Shawinigan, Quebec' },
+  { id:'mingan-archipelago', name:'Mingan Archipelago', kind:'reserve', tier:'main', province:'QC', lat:50.217, lng:-63.167, blurb:'Limestone monoliths and puffin colonies in the Gulf of St. Lawrence.', addr:'Havre-Saint-Pierre, Quebec' },
+  { id:'mount-revelstoke', name:'Mount Revelstoke', kind:'park', tier:'main', province:'BC', lat:51.083, lng:-118.067, blurb:'A summit drive through rainforest to alpine meadows.', addr:'Revelstoke, British Columbia' },
+  { id:'naatsihchoh', name:"Nááts'įhch'oh", kind:'reserve', tier:'main', province:'NT', lat:62.367, lng:-127.967, blurb:'Moose Ponds and the headwaters of the South Nahanni River.', addr:'Tulita, Northwest Territories' },
+  { id:'nahanni', name:'Nahanni', kind:'reserve', tier:'main', province:'NT', lat:61.550, lng:-125.583, blurb:'Virginia Falls and the legendary South Nahanni River.', addr:'Fort Simpson, Northwest Territories' },
+  { id:'pacific-rim', name:'Pacific Rim', kind:'reserve', tier:'main', province:'BC', lat:48.633, lng:-124.767, blurb:'Long Beach surf and the West Coast Trail rainforest.', addr:'Tofino, British Columbia' },
+  { id:'pituamkek', name:'Pituamkek', kind:'reserve', tier:'main', province:'PE', lat:46.611, lng:-63.785, blurb:"A 50 km chain of barrier islands off PEI — a Mi'kmaq homeland of dunes and piping plovers.", addr:'Lennox Island, Prince Edward Island' },
+  { id:'point-pelee', name:'Point Pelee', kind:'park', tier:'main', province:'ON', lat:41.967, lng:-82.517, blurb:"Canada's southernmost mainland — a spring birding magnet.", addr:'Leamington, Ontario' },
+  { id:'prince-albert', name:'Prince Albert', kind:'park', tier:'main', province:'SK', lat:53.967, lng:-106.367, blurb:"Boreal forest, Waskesiu Lake and Grey Owl's cabin.", addr:'Waskesiu Lake, Saskatchewan' },
+  { id:'prince-edward-island', name:'Prince Edward Island', kind:'park', tier:'main', province:'PE', lat:46.417, lng:-63.083, blurb:'Red sandstone cliffs and the Green Gables shore.', addr:'Cavendish, Prince Edward Island' },
+  { id:'pukaskwa', name:'Pukaskwa', kind:'park', tier:'main', province:'ON', lat:48.250, lng:-85.883, blurb:'The wildest shoreline on the Great Lakes.', addr:'Marathon, Ontario' },
+  { id:'qausuittuq', name:'Qausuittuq', kind:'park', tier:'main', province:'NU', lat:76.000, lng:-100.000, blurb:'High Arctic refuge for Peary caribou on Bathurst Island.', addr:'Resolute, Nunavut' },
+  { id:'quttinirpaaq', name:'Quttinirpaaq', kind:'park', tier:'main', province:'NU', lat:82.217, lng:-72.217, blurb:"Canada's northernmost park — Lake Hazen and polar desert.", addr:'Resolute, Nunavut' },
+  { id:'riding-mountain', name:'Riding Mountain', kind:'park', tier:'main', province:'MB', lat:50.867, lng:-100.033, blurb:'Boreal forest and bison above the Manitoba prairie.', addr:'Wasagaming, Manitoba' },
+  { id:'sable-island', name:'Sable Island', kind:'reserve', tier:'main', province:'NS', lat:43.950, lng:-59.917, blurb:'A crescent of sand famous for its wild horses.', addr:'Halifax, Nova Scotia' },
+  { id:'sirmilik', name:'Sirmilik', kind:'park', tier:'main', province:'NU', lat:72.983, lng:-81.133, blurb:'Glaciers, hoodoos and narwhal waters off Bylot Island.', addr:'Pond Inlet, Nunavut' },
+  { id:'terra-nova', name:'Terra Nova', kind:'park', tier:'main', province:'NL', lat:48.533, lng:-53.933, blurb:"Rocky coves and boreal forest on Newfoundland's east coast.", addr:'Glovertown, Newfoundland and Labrador' },
+  { id:'thaidene-nene', name:'Thaidene Nëné', kind:'reserve', tier:'main', province:'NT', lat:62.500, lng:-111.000, blurb:"Land of the Ancestors — Great Slave Lake's East Arm.", addr:"Lutselk'e, Northwest Territories" },
+  { id:'thousand-islands', name:'Thousand Islands', kind:'park', tier:'main', province:'ON', lat:44.350, lng:-75.950, blurb:'Granite islands scattered along the St. Lawrence River.', addr:'Gananoque, Ontario' },
+  { id:'torngat-mountains', name:'Torngat Mountains', kind:'park', tier:'main', province:'NL', lat:59.433, lng:-63.867, blurb:"Labrador's highest peaks and Inuit ancestral lands.", addr:'Nain, Newfoundland and Labrador' },
+  { id:'tuktut-nogait', name:'Tuktut Nogait', kind:'park', tier:'main', province:'NT', lat:68.817, lng:-121.750, blurb:'Tundra canyons protecting the Bluenose caribou herd.', addr:'Paulatuk, Northwest Territories' },
+  { id:'ukkusiksalik', name:'Ukkusiksalik', kind:'park', tier:'main', province:'NU', lat:65.350, lng:-87.300, blurb:'Wager Bay — polar bear country and Thule relics.', addr:'Naujaat, Nunavut' },
+  { id:'vuntut', name:'Vuntut', kind:'park', tier:'main', province:'YT', lat:68.367, lng:-139.850, blurb:'Unglaciated Yukon plains travelled by the Porcupine caribou herd.', addr:'Old Crow, Yukon' },
+  { id:'wapusk', name:'Wapusk', kind:'park', tier:'main', province:'MB', lat:57.767, lng:-93.367, blurb:'Polar bear maternity dens by Hudson Bay.', addr:'Churchill, Manitoba' },
+  { id:'waterton-lakes', name:'Waterton Lakes', kind:'park', tier:'main', province:'AB', lat:49.050, lng:-113.917, blurb:'Where the prairie meets the Rockies — an International Peace Park.', addr:'Waterton Park, Alberta' },
+  { id:'wood-buffalo', name:'Wood Buffalo', kind:'park', tier:'main', province:'AB', lat:59.383, lng:-112.983, blurb:"Canada's largest park — wood bison and whooping cranes. (Spans AB / NT.)", addr:'Fort Smith, Northwest Territories' },
+  { id:'yoho', name:'Yoho', kind:'park', tier:'main', province:'BC', lat:51.400, lng:-116.483, blurb:'Takakkaw Falls, Emerald Lake and Burgess Shale fossils.', addr:'Field, British Columbia' }
 ];
 
 /* BONUS QUEST — Rouge National Urban Park: Canada's only National
@@ -104,7 +105,7 @@ var PARKS_MAIN = [
    map and can be cleared like any quest, but it never counts toward
    the 48 counter, EXP, levels or province fills. */
 var PARKS_BONUS = [
-  { id:'rouge', name:'Rouge', kind:'urban', tier:'bonus', province:'ON', lat:43.933, lng:-79.233, blurb:"North America's largest urban park, inside Toronto." }
+  { id:'rouge', name:'Rouge', kind:'urban', tier:'bonus', province:'ON', lat:43.933, lng:-79.233, blurb:"North America's largest urban park, inside Toronto.", addr:'Scarborough, Ontario' }
 ];
 
 /* SIDE QUESTS — curated provincial parks, one set per province.
@@ -112,16 +113,16 @@ var PARKS_BONUS = [
    Ontario coordinates: Ontario Parks gatehouse listings + Wikipedia. */
 var SIDE_SETS = [
   { id:'side-on', province:'ON', label:'Ontario', parks:[
-    { id:'sp-algonquin', name:'Algonquin', kind:'provincial', tier:'side', province:'ON', lat:45.838, lng:-78.379, blurb:"Ontario's iconic wilderness — moose, lakes and endless canoe routes." },
-    { id:'sp-killarney', name:'Killarney', kind:'provincial', tier:'side', province:'ON', lat:46.013, lng:-81.402, blurb:'White quartzite ridges and sapphire lakes on Georgian Bay.' },
-    { id:'sp-sandbanks', name:'Sandbanks', kind:'provincial', tier:'side', province:'ON', lat:43.911, lng:-77.242, blurb:'Giant sand dunes and soft beaches on Lake Ontario.' },
-    { id:'sp-bon-echo', name:'Bon Echo', kind:'provincial', tier:'side', province:'ON', lat:44.897, lng:-77.210, blurb:"Mazinaw Rock's towering cliff and Indigenous pictographs." },
-    { id:'sp-pinery', name:'The Pinery', kind:'provincial', tier:'side', province:'ON', lat:43.260, lng:-81.830, blurb:'Rare oak savanna and sunset beaches on Lake Huron.' },
-    { id:'sp-arrowhead', name:'Arrowhead', kind:'provincial', tier:'side', province:'ON', lat:45.392, lng:-79.214, blurb:'Waterfalls and forest trails near Huntsville — stunning in fall.' },
-    { id:'sp-killbear', name:'Killbear', kind:'provincial', tier:'side', province:'ON', lat:45.359, lng:-80.213, blurb:'Wind-swept pines and rocky Georgian Bay shoreline.' },
-    { id:'sp-grundy-lake', name:'Grundy Lake', kind:'provincial', tier:'side', province:'ON', lat:45.933, lng:-80.550, blurb:'Smooth rock shores and quiet lakes just off Highway 69.' },
-    { id:'sp-awenda', name:'Awenda', kind:'provincial', tier:'side', province:'ON', lat:44.844, lng:-80.003, blurb:'Ancient dunes and cool forest on Georgian Bay.' },
-    { id:'sp-macgregor-point', name:'MacGregor Point', kind:'provincial', tier:'side', province:'ON', lat:44.409, lng:-81.447, blurb:'Lake Huron sunsets and spring bird migration.' }
+    { id:'sp-algonquin', name:'Algonquin', kind:'provincial', tier:'side', province:'ON', lat:45.838, lng:-78.379, blurb:"Ontario's iconic wilderness — moose, lakes and endless canoe routes.", addr:'Highway 60, Algonquin Park, Ontario' },
+    { id:'sp-killarney', name:'Killarney', kind:'provincial', tier:'side', province:'ON', lat:46.013, lng:-81.402, blurb:'White quartzite ridges and sapphire lakes on Georgian Bay.', addr:'Killarney, Ontario' },
+    { id:'sp-sandbanks', name:'Sandbanks', kind:'provincial', tier:'side', province:'ON', lat:43.911, lng:-77.242, blurb:'Giant sand dunes and soft beaches on Lake Ontario.', addr:'Picton, Ontario' },
+    { id:'sp-bon-echo', name:'Bon Echo', kind:'provincial', tier:'side', province:'ON', lat:44.897, lng:-77.210, blurb:"Mazinaw Rock's towering cliff and Indigenous pictographs.", addr:'Cloyne, Ontario' },
+    { id:'sp-pinery', name:'The Pinery', kind:'provincial', tier:'side', province:'ON', lat:43.260, lng:-81.830, blurb:'Rare oak savanna and sunset beaches on Lake Huron.', addr:'Grand Bend, Ontario' },
+    { id:'sp-arrowhead', name:'Arrowhead', kind:'provincial', tier:'side', province:'ON', lat:45.392, lng:-79.214, blurb:'Waterfalls and forest trails near Huntsville — stunning in fall.', addr:'Huntsville, Ontario' },
+    { id:'sp-killbear', name:'Killbear', kind:'provincial', tier:'side', province:'ON', lat:45.359, lng:-80.213, blurb:'Wind-swept pines and rocky Georgian Bay shoreline.', addr:'Parry Sound, Ontario' },
+    { id:'sp-grundy-lake', name:'Grundy Lake', kind:'provincial', tier:'side', province:'ON', lat:45.933, lng:-80.550, blurb:'Smooth rock shores and quiet lakes just off Highway 69.', addr:'Britt, Ontario' },
+    { id:'sp-awenda', name:'Awenda', kind:'provincial', tier:'side', province:'ON', lat:44.844, lng:-80.003, blurb:'Ancient dunes and cool forest on Georgian Bay.', addr:'Penetanguishene, Ontario' },
+    { id:'sp-macgregor-point', name:'MacGregor Point', kind:'provincial', tier:'side', province:'ON', lat:44.409, lng:-81.447, blurb:'Lake Huron sunsets and spring bird migration.', addr:'Port Elgin, Ontario' }
   ] }
 ];
 
@@ -152,12 +153,13 @@ var SAMPLE_VISITS = {
 
 /* ---------------- State ----------------
    visits: quest stamps, keyed by park id (main + side share this map;
-   counters always filter by tier). camps: FREE personal spots, kept
-   in a fully separate array — never mixed into quest counts. */
+   counters always filter by tier). Saves written before the My
+   Spots removal may still carry a camps array — it is ignored on
+   load and never written back. */
 var LS_KEY = 'maplepins_quest_v1';
-var state = { visits:{}, camps:[], samplesActive:false };
+var state = { visits:{}, samplesActive:false };
 function statePayload() {
-  return { visits: state.visits, camps: state.camps,
+  return { visits: state.visits,
            seeded: true, samples: state.samplesActive };
 }
 function saveState() {
@@ -169,7 +171,6 @@ function loadState() {
   try { raw = localStorage.getItem(LS_KEY); } catch (e) { /* ignore */ }
   if (!raw) {
     state.visits = JSON.parse(JSON.stringify(SAMPLE_VISITS));
-    state.camps = [];
     state.samplesActive = true;   /* first run: these stamps are demos */
     saveState();
     return;
@@ -177,9 +178,9 @@ function loadState() {
   try {
     var d = JSON.parse(raw);
     state.visits = d.visits || {};
-    state.camps = Array.isArray(d.camps) ? d.camps : [];
+    /* d.camps (pre-removal saves) is deliberately not read. */
     state.samplesActive = !!d.samples;
-  } catch (e) { state.visits = {}; state.camps = []; state.samplesActive = false; }
+  } catch (e) { state.visits = {}; state.samplesActive = false; }
 }
 function mainCleared() {
   return PARKS_MAIN.filter(function (p) { return !!state.visits[p.id]; }).length;
@@ -279,7 +280,7 @@ var mapSvg = $('mapSvg'), posterSvg = $('posterSvg');
 var view = { cx:0, cy:0, w:10 };
 var viewAnim = null, focusCode = null;
 var mapParts = null, posterParts = null;
-var markerEls = [];   /* {g, kind:'park'|'camp', park?, camp?} for rescaling */
+var markerEls = [];   /* {g, park} for rescaling */
 var clipSeq = 0;
 
 function svgEl(tag, attrs) {
@@ -297,7 +298,6 @@ function setImageHref(img, url) {
   try { img.setAttributeNS(XLINK_NS, 'xlink:href', url); } catch (e) { /* ignore */ }
 }
 function project(lat, lng) { return [(lng - GEO.minLng) * K_LNG, GEO.maxLat - lat]; }
-function unproject(x, y) { return { lat: GEO.maxLat - y, lng: GEO.minLng + x / K_LNG }; }
 function geomToPath(geom) {
   var d = '';
   geom.coordinates.forEach(function (poly) {
@@ -366,7 +366,7 @@ async function loadGeo() {
   FULL = { x: -PAD, y: -PAD, w: w + PAD * 2, h: h + PAD * 2 };
 }
 /* Province fill deepens as its MAIN quests clear — a living map.
-   (Bonus, side quests and camps never recolour a province.)
+   (Bonus and side quests never recolour a province.)
    Winter reskin (Minji, 2026-11-26): the old parchment-gold ramp
    became a snow ramp, untouched snow to a slightly deeper ice
    blue as a province fills in. */
@@ -396,7 +396,7 @@ function provRatio(code) {
 function provFillOpacity(code) { return 0.55 + 0.45 * provRatio(code); }
 function buildSvgView(svg, isMain) {
   var viewKey = isMain ? 'm' : 'p';
-  var parts = { paths:{}, labels:null, markers:null, camps:null, temp:null, badges:null,
+  var parts = { paths:{}, labels:null, markers:null, badges:null,
     labelEls:{}, fillGroups:{}, outlines:{}, glow:{}, route:null, rays:null, viewKey: viewKey };
   /* Clips: one per province (its outline) and one per park cell.
      Ids are prefixed per view so map and poster never collide. */
@@ -430,6 +430,14 @@ function buildSvgView(svg, isMain) {
     { id: 'panelshadow-' + viewKey, cx: '50%', cy: '50%', r: '50%' }),
     [['0%', '#0b2138', 0.34], ['62%', '#0b2138', 0.16],
      ['100%', '#0b2138', 0]]));
+  /* Blur for the fitted-photo backdrop (see renderPhotoFills):
+     one filter per view, stdDeviation in user units, so the
+     poster export — which serializes this same SVG — blurs
+     proportionally at print scale. */
+  var photoBgFilter = svgEl('filter', { id: 'photobg-' + viewKey,
+    x: '-20%', y: '-20%', width: '140%', height: '140%' });
+  photoBgFilter.appendChild(svgEl('feGaussianBlur', { stdDeviation: 0.45 }));
+  defs.appendChild(photoBgFilter);
   svg.appendChild(defs);
   /* Winter panel (Minji, 2026-11-26, replacing the treasure-map
      parchment sheet and its scroll rolls): one clean rounded
@@ -520,11 +528,9 @@ function buildSvgView(svg, isMain) {
   });
   svg.appendChild(parts.labels);
   parts.markers = svgEl('g'); svg.appendChild(parts.markers);
-  parts.camps = svgEl('g'); svg.appendChild(parts.camps);
   /* Quest "!" badges float above every marker and label (interactive
      map only — renderMarkersInto leaves this empty for the poster). */
   parts.badges = svgEl('g'); svg.appendChild(parts.badges);
-  if (isMain) { parts.temp = svgEl('g'); svg.appendChild(parts.temp); }
 
   svg.setAttribute('viewBox', (FULL.x - SHEET_PAD) + ' ' +
     (FULL.y - SHEET_PAD) + ' ' + (FULL.w + SHEET_PAD * 2) + ' ' +
@@ -856,6 +862,104 @@ function leafMarker(x, y, s, opened, bonus) {
   g.appendChild(hit);
   return g;
 }
+/* ---------------- Photo fit: cover vs contain ----------------
+   A cleared park's photo used to be cover-fit (slice) over its
+   cell no matter what: in a small or lopsided cell most of the
+   photo was cropped away, and a document-style photo became
+   unreadable (Minji, 2026-11-26: "사진 자체를 작게 만들어서
+   작은 부위에 맞게"). Rule now: measure how much of the photo
+   cover-fit would keep. If it keeps at least 60%, cover stays —
+   big, well-matched cells keep the map-made-of-photos look. If
+   cover would crop away more than 40%, the WHOLE photo is
+   shrunk to fit inside the cell (contain), centred over a
+   blurred, frosted copy of itself, so the photo is always fully
+   visible and the cell never looks empty. */
+var PHOTO_FIT_MIN_VISIBLE = 0.6;  /* cover must keep >=60% of the photo */
+var PHOTO_FIT_INSET = 0.94;       /* contain rect breathing room vs the bbox */
+var photoSizeCache = {};
+/* A photo's pixel size without decoding it: every photo the app
+   stores is a data URL it made itself (JPEG from uploads, PNG
+   placeholder art), and both formats carry their dimensions in
+   the header bytes. Returns {w,h} or null. Synchronous on
+   purpose — the poster export clones the SVG exactly as built,
+   so the fit decision must never wait on an async image load. */
+function photoDataSize(url) {
+  if (!url || url.slice(0, 5) !== 'data:') return null;
+  if (Object.prototype.hasOwnProperty.call(photoSizeCache, url)) {
+    return photoSizeCache[url];
+  }
+  var size = null;
+  try {
+    var comma = url.indexOf(',');
+    var head = url.slice(0, comma).toLowerCase();
+    var bin = atob(url.slice(comma + 1));
+    var byteAt = function (i) { return bin.charCodeAt(i) & 0xff; };
+    var u16be = function (i) { return (byteAt(i) << 8) | byteAt(i + 1); };
+    var u32be = function (i) {
+      return ((byteAt(i) << 24) | (byteAt(i + 1) << 16) |
+              (byteAt(i + 2) << 8) | byteAt(i + 3)) >>> 0;
+    };
+    if (head.indexOf('image/png') >= 0 && bin.length > 24) {
+      size = { w: u32be(16), h: u32be(20) };
+    } else if (head.indexOf('image/gif') >= 0 && bin.length > 10) {
+      size = { w: byteAt(6) | (byteAt(7) << 8),
+               h: byteAt(8) | (byteAt(9) << 8) };
+    } else if (head.indexOf('image/jpeg') >= 0) {
+      var i = 2;   /* skip the SOI marker */
+      while (i + 9 < bin.length) {
+        if (byteAt(i) !== 0xff) { i++; continue; }
+        var marker = byteAt(i + 1);
+        if (marker === 0xc0 || marker === 0xc1 || marker === 0xc2) {
+          size = { w: u16be(i + 7), h: u16be(i + 5) };
+          break;
+        }
+        if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd9)) {
+          i += 2; continue;   /* standalone markers carry no length */
+        }
+        var len = u16be(i + 2);
+        if (len < 2) break;
+        i += 2 + len;
+      }
+    }
+  } catch (e) { size = null; }
+  if (size && !(size.w > 0 && size.h > 0)) size = null;
+  photoSizeCache[url] = size;
+  return size;
+}
+/* 'cover' when cover-fit keeps enough of the photo (or its size
+   is unknown — cover is the historical behaviour); 'fit' when
+   cover would crop more than 40% of the photo away. The visible
+   fraction of a cover-fit is min/max of the two aspect ratios. */
+function photoFitMode(cell, url) {
+  var size = photoDataSize(url);
+  if (!size) return 'cover';
+  var cellRatio = (cell.x1 - cell.x0) / (cell.y1 - cell.y0);
+  var photoRatio = size.w / size.h;
+  var visible = Math.min(cellRatio, photoRatio) /
+                Math.max(cellRatio, photoRatio);
+  return visible >= PHOTO_FIT_MIN_VISIBLE ? 'cover' : 'fit';
+}
+/* Is a rect fully inside a (convex) Voronoi cell polygon? A
+   point is inside a convex polygon when it stays on the same
+   side of every edge; the rect fits when all four corners do. */
+function rectInCell(cell, x, y, w, h) {
+  var pts = cell.pts;
+  var corners = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+  for (var c = 0; c < 4; c++) {
+    var px = corners[c][0], py = corners[c][1];
+    var sign = 0;
+    for (var i = 0; i < pts.length; i++) {
+      var a = pts[i], b = pts[(i + 1) % pts.length];
+      var cross = (b[0] - a[0]) * (py - a[1]) - (b[1] - a[1]) * (px - a[0]);
+      if (cross !== 0) {
+        if (sign === 0) sign = cross > 0 ? 1 : -1;
+        else if ((cross > 0 ? 1 : -1) !== sign) return false;
+      }
+    }
+  }
+  return true;
+}
+
 /* Renders the cell layer of one view (map or poster). Everything
    here uses presentation attributes, not CSS classes, so the
    fills survive the poster's SVG serialization byte-for-byte. */
@@ -878,20 +982,68 @@ function renderPhotoFills(parts) {
         stroke: 'rgba(185,210,228,0.9)', 'stroke-width': 0.05,
         'stroke-linejoin': 'round', 'data-sw': 0.05 }));
     });
-    /* Filled cells: the photo, cover-fit over the cell's bbox and
-       clipped to the cell shape, with a bright edge re-stroked on
-       top so the piece reads against its neighbours. */
+    /* Filled cells: the photo over the cell's bbox, clipped to
+       the cell shape, with a bright edge re-stroked on top so
+       the piece reads against its neighbours. Cover-fit by
+       default; contain-fit (whole photo, blurred backdrop) when
+       cover would crop too much of the photo — photoFitMode. */
     parks.forEach(function (park) {
       var cell = CELLS[park.id];
       if (!cell) return;
       var url = cellPhotoURL(park);
       if (!url) return;
       var cg = svgEl('g', { 'clip-path': 'url(#cellclip-' + parts.viewKey + '-' + park.id + ')' });
-      var img = svgEl('image', { x: cell.x0, y: cell.y0,
-        width: cell.x1 - cell.x0, height: cell.y1 - cell.y0,
-        preserveAspectRatio: 'xMidYMid slice' });
-      setImageHref(img, url);
-      cg.appendChild(img);
+      var bw = cell.x1 - cell.x0, bh = cell.y1 - cell.y0;
+      if (photoFitMode(cell, url) === 'fit') {
+        /* Backdrop: the same photo cover-fit, blurred and washed
+           pale, so the cell still reads as filled land. */
+        var bg = svgEl('image', { x: cell.x0, y: cell.y0,
+          width: bw, height: bh,
+          preserveAspectRatio: 'xMidYMid slice',
+          filter: 'url(#photobg-' + parts.viewKey + ')', opacity: 0.6 });
+        setImageHref(bg, url);
+        cg.appendChild(bg);
+        cg.appendChild(svgEl('rect', { x: cell.x0, y: cell.y0,
+          width: bw, height: bh, fill: '#eef6fb', opacity: 0.32 }));
+        /* Foreground: the WHOLE photo, contain-fit inside the
+           bbox, slightly inset, centred on the cell polygon's
+           centroid, then shrunk around that centre until all
+           four corners sit inside the polygon — wedge-shaped
+           cells (Pituamkek's slanted east side) would otherwise
+           slice the photo's edge off even in contain mode. A
+           thin white border makes it read as a placed photo
+           rather than a faded patch of the backdrop. */
+        var size = photoDataSize(url);
+        var ratio = size.w / size.h;
+        var fw = Math.min(bw, bh * ratio), fh = fw / ratio;
+        fw *= PHOTO_FIT_INSET; fh *= PHOTO_FIT_INSET;
+        var ccx = 0, ccy = 0;
+        cell.pts.forEach(function (p) { ccx += p[0]; ccy += p[1]; });
+        ccx /= cell.pts.length; ccy /= cell.pts.length;
+        var fitScale = 1;
+        while (fitScale > 0.5 &&
+               !rectInCell(cell, ccx - fw * fitScale / 2,
+                           ccy - fh * fitScale / 2,
+                           fw * fitScale, fh * fitScale)) {
+          fitScale *= 0.92;
+        }
+        fw *= fitScale; fh *= fitScale;
+        var fx = ccx - fw / 2;
+        var fy = ccy - fh / 2;
+        var fg = svgEl('image', { x: fx, y: fy, width: fw, height: fh,
+          preserveAspectRatio: 'xMidYMid meet' });
+        setImageHref(fg, url);
+        cg.appendChild(fg);
+        cg.appendChild(svgEl('rect', { x: fx, y: fy, width: fw, height: fh,
+          fill: 'none', stroke: '#ffffff', 'stroke-width': 0.045,
+          'data-sw': 0.045 }));
+      } else {
+        var img = svgEl('image', { x: cell.x0, y: cell.y0,
+          width: bw, height: bh,
+          preserveAspectRatio: 'xMidYMid slice' });
+        setImageHref(img, url);
+        cg.appendChild(img);
+      }
       g.appendChild(cg);
       /* A white edge with a soft slate halo, so a filled piece
          reads 뚜렷하게 against both its photo neighbours and the
@@ -938,20 +1090,6 @@ function chestShrink(zoom) {
 }
 function markerSize() { /* radius of a main marker at the live view */
   return mainMarkerRadius(FULL.w / view.w, true);
-}
-function squareMarker(x, y, s, cls, glyph, glyphScale) {
-  var g = svgEl('g', { 'class': 'park-marker' });
-  g.appendChild(svgEl('rect', { x: x - s + 0.1, y: y - s + 0.13, width: s * 2, height: s * 2, 'class': 'mk-shadow' }));
-  g.appendChild(svgEl('rect', { x: x - s, y: y - s, width: s * 2, height: s * 2, 'class': cls, 'stroke-width': 0.09 }));
-  if (glyph) {
-    var t = svgEl('text', { x: x, y: y, 'text-anchor': 'middle', 'dominant-baseline': 'central',
-      'class': glyph === '?' ? 'mk-q' : 'mk-star', 'font-size': s * (glyphScale || 1.15) });
-    t.textContent = glyph;
-    g.appendChild(t);
-  }
-  var hit = svgEl('rect', { x: x - s * 1.9, y: y - s * 1.9, width: s * 3.8, height: s * 3.8, 'class': 'hit' });
-  g.appendChild(hit);
-  return g;
 }
 function circleMarker(x, y, r, cls, glyph, glyphScale) {
   var g = svgEl('g', { 'class': 'park-marker' });
@@ -1093,7 +1231,6 @@ function bindTap(el, fn) {
 }
 function renderMarkersInto(parts, interactive, viewW) {
   while (parts.markers.firstChild) parts.markers.removeChild(parts.markers.firstChild);
-  while (parts.camps.firstChild) parts.camps.removeChild(parts.camps.firstChild);
   if (parts.badges) while (parts.badges.firstChild) parts.badges.removeChild(parts.badges.firstChild);
   var zoom = FULL.w / (viewW || FULL.w);
   var sMain = mainMarkerRadius(zoom, interactive);
@@ -1126,10 +1263,9 @@ function renderMarkersInto(parts, interactive, viewW) {
     var g;
     if (it.side && visit && visit.photo) {
       /* Side quests own no map cell, so a cleared side park shows
-         its photo as a round thumbnail marker (same treatment as
-         campsites). Without this the photo existed only inside
-         the quest card, and stamping a side park looked exactly
-         like the photo never uploaded. */
+         its photo as a round thumbnail marker. Without this the
+         photo existed only inside the quest card, and stamping a
+         side park looked exactly like the photo never uploaded. */
       g = photoMarker(it.x, it.y, it.s * 1.15, visit.photo, 'mk-photo-side');
     } else if (it.side) {
       g = circleMarker(it.x, it.y, it.s,
@@ -1166,35 +1302,6 @@ function renderMarkersInto(parts, interactive, viewW) {
       parts.badges.appendChild(bg);
     }
     parts.markers.appendChild(g);
-  });
-  state.camps.forEach(function (camp) {
-    var xy = project(camp.lat, camp.lng);
-    var s = sMain * 0.92 * (camp.photo ? 1.25 : 1);
-    var g;
-    if (camp.photo) {
-      g = photoMarker(xy[0], xy[1], s, camp.photo, 'mk-photo');
-      g.setAttribute('class', 'camp-marker');
-      g.querySelector('.mk-photo').setAttribute('style', 'stroke:#2e7d46');
-    } else {
-      g = squareMarker(xy[0], xy[1], s, 'mk-camp', '⛺', 0.95);
-      g.setAttribute('class', 'camp-marker');
-    }
-    if (interactive) {
-      (function (cp) {
-        bindTap(g, function () { openCampView(cp); });
-        g.setAttribute('tabindex', '0');
-        g.setAttribute('role', 'button');
-        g.setAttribute('aria-label', cp.name + ' — my campsite');
-        g.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            openCampView(cp);
-          }
-        });
-      })(camp);
-      markerEls.push({ g: g });
-    }
-    parts.camps.appendChild(g);
   });
 }
 function renderMap() {
@@ -1382,7 +1489,7 @@ function refreshFocusUI() {
     }
   }
   $('tapHint').textContent = focusCode
-    ? '📍 ' + PROVINCE_BY_CODE[focusCode].name + ' — tap a marker, or tap the map to pitch your tent ⛺'
+    ? '📍 ' + PROVINCE_BY_CODE[focusCode].name + ' — tap a marker to open its quest card'
     : 'Tap a province to explore its parks 🏕';
 }
 function focusProvince(code) {
@@ -1403,7 +1510,6 @@ function exitFocus(fromPop) {
   if (!GEO || !FULL) return;
   focusCode = null;
   if (!fromPop) layerPopUI('focus');
-  clearTempCamp();
   refreshFocusUI();
   renderMap();   /* and the "!" badges go away with the focus */
   var hf = homeFraming();
@@ -1445,22 +1551,7 @@ function focusCell(park) {
 }
 
 /* ---------------- Pointer: drag to pan, tap to act ---------------- */
-var drag = null, pendingCamp = null;
-function clearTempCamp() {
-  pendingCamp = null;
-  if (mapParts && mapParts.temp) {
-    while (mapParts.temp.firstChild) mapParts.temp.removeChild(mapParts.temp.firstChild);
-  }
-}
-function showTempCamp(lat, lng) {
-  clearTempCamp();
-  pendingCamp = { lat: lat, lng: lng };
-  var xy = project(lat, lng);
-  var s = markerSize();
-  var g = squareMarker(xy[0], xy[1], s, 'mk-temp', '⛺', 0.95);
-  g.setAttribute('class', 'camp-marker');
-  mapParts.temp.appendChild(g);
-}
+var drag = null;
 mapSvg.addEventListener('pointerdown', function (e) {
   if (pinching) return;
   drag = { x: e.clientX, y: e.clientY, cx: view.cx, cy: view.cy, moved: false };
@@ -1492,11 +1583,8 @@ mapSvg.addEventListener('pointerup', function (e) {
     return;
   }
   if (code && code !== focusCode) { focusProvince(code); return; }
-  /* Focused: a tap on open map = pitch a tent here. */
-  var ll = unproject(p.x, p.y);
-  if (ll.lat < 41 || ll.lat > 84 || ll.lng < -142 || ll.lng > -52) return;
-  showTempCamp(ll.lat, ll.lng);
-  openCampForm();
+  /* Focused and tapped open map: nothing to do — markers carry
+     the actions now that My Spots is gone. */
 });
 mapSvg.addEventListener('pointercancel', function () { drag = null; });
 
@@ -1508,8 +1596,8 @@ mapSvg.addEventListener('pointercancel', function () { drag = null; });
    from the pinch centre. While a pinch is active the single-
    finger handlers above stand down, and taps stay suppressed
    briefly after it ends — lifting a finger must never open a
-   quest card or pitch a tent by accident. The zoom buttons stay
-   as the one-handed alternative. */
+   quest card by accident. The zoom buttons stay as the
+   one-handed alternative. */
 var activePtrs = {}, pinch = null, pinching = false, lastPinchEnd = 0;
 function suppressTap() { return pinching || (Date.now() - lastPinchEnd < 400); }
 function ptrList() { return Object.keys(activePtrs).map(function (k) { return activePtrs[k]; }); }
@@ -1561,7 +1649,7 @@ mapSvg.addEventListener('dblclick', function (e) {
 });
 
 /* ---------------- Sheets ---------------- */
-var SHEETS = ['parkSheet', 'campSheet', 'journalSheet', 'posterSheet', 'settingsSheet'];
+var SHEETS = ['parkSheet', 'journalSheet', 'posterSheet', 'settingsSheet'];
 function anySheetOpen() {
   return SHEETS.some(function (s) { return !$(s).hidden; });
 }
@@ -1604,7 +1692,6 @@ function openSheet(id) {
 function closeSheets(fromPop) {
   SHEETS.forEach(function (s) { $(s).hidden = true; });
   $('backdrop').hidden = true;
-  clearTempCamp();
   if (!fromPop) layerPopUI('sheet');
 }
 $('backdrop').addEventListener('click', function () { closeSheets(); });
@@ -1638,7 +1725,6 @@ function renderHUD() {
     chips += '<span class="side-chip sample">📝 Sample stamps — demo data, ' +
       'reset in Setup to start yours</span>';
   }
-  chips += '<span class="side-chip camp">⛺ My Spots ' + state.camps.length + '</span>';
   $('hudChips').innerHTML = chips;
 }
 
@@ -1744,6 +1830,20 @@ function spawnLeafBurst() {
 }
 
 /* ---------------- Park quest card ---------------- */
+/* Google Maps search for a park: its official name (with the
+   park designation) + province — Google resolves the exact
+   entrances and roads from there. The card shows the short
+   park.addr text; the link does the wayfinding. */
+function parkMapsUrl(park) {
+  var designation = park.kind === 'provincial' ? ' Provincial Park'
+    : park.kind === 'urban' ? ' National Urban Park'
+    : park.kind === 'reserve' ? ' National Park Reserve'
+    : ' National Park';
+  var q = park.name + designation + ', ' +
+    PROVINCE_BY_CODE[park.province].name;
+  return 'https://www.google.com/maps/search/?api=1&query=' +
+    encodeURIComponent(q);
+}
 var currentPark = null, pendingPhoto = undefined;
 function openPark(park) {
   currentPark = park;
@@ -1756,6 +1856,15 @@ function openPark(park) {
   $('pkProv').textContent = PROVINCE_BY_CODE[park.province].name;
   $('pkKind').textContent = KIND_LABEL[park.kind] +
     (park.tier === 'side' ? ' · Side Quest' : (park.tier === 'bonus' ? ' · Bonus Quest' : ''));
+  var addrWrap = $('pkAddrWrap');
+  if (park.addr) {
+    addrWrap.hidden = false;
+    $('pkAddr').href = parkMapsUrl(park);
+    $('pkAddrText').textContent = park.addr;
+  } else {
+    addrWrap.hidden = true;
+    $('pkAddr').removeAttribute('href');
+  }
   $('pkBlurb').textContent = park.blurb;
   $('visitForm').hidden = true;
   $('vPreview').hidden = true;
@@ -1899,78 +2008,6 @@ function saveStateChecked(dropNewPhoto) {
   }
 }
 
-/* ---------------- My campsites (free layer) ---------------- */
-var currentCamp = null, campPhotoData = undefined;
-function openCampForm() {
-  currentCamp = null;
-  campPhotoData = undefined;
-  $('campForm').hidden = false;
-  $('campView').hidden = true;
-  $('cName').value = '';
-  $('cDate').value = todayStr();
-  $('cDate').max = todayStr();   /* a camp night can't be in the future */
-  $('cPhoto').value = '';
-  $('cPreview').hidden = true;
-  openSheet('campSheet');
-}
-function openCampView(camp) {
-  currentCamp = camp;
-  clearTempCamp();
-  $('campForm').hidden = true;
-  $('campView').hidden = false;
-  $('cvName').textContent = '⛺ ' + camp.name;
-  $('cvDate').textContent = 'Pitched ' + fmtDate(camp.date);
-  var img = $('cvPhoto');
-  if (camp.photo) { img.src = camp.photo; img.hidden = false; } else img.hidden = true;
-  openSheet('campSheet');
-}
-$('campCancelBtn').addEventListener('click', function () {
-  closeSheets();
-});
-$('cPhoto').addEventListener('change', function () {
-  var input = this;
-  var f = input.files && input.files[0];
-  if (!f) { campPhotoData = undefined; $('cPreview').hidden = true; return; }
-  fileToDataURL(f, function (url) {
-    campPhotoData = url;
-    if (url) { $('cPreview').src = url; $('cPreview').hidden = false; }
-    else {
-      $('cPreview').hidden = true;
-      input.value = '';
-      alert(PHOTO_READ_FAIL_MSG);
-    }
-  });
-});
-$('campForm').addEventListener('submit', function (e) {
-  e.preventDefault();
-  if (!pendingCamp) { closeSheets(); return; }
-  if ($('cDate').value && $('cDate').value > todayStr()) {
-    alert('That date is in the future — pick the day you actually camped.');
-    return;
-  }
-  var camp = {
-    id: 'camp-' + Date.now(),
-    name: $('cName').value.trim() || 'My campsite',
-    lat: pendingCamp.lat, lng: pendingCamp.lng,
-    date: $('cDate').value || todayStr(),
-    photo: campPhotoData || null
-  };
-  state.camps.push(camp);
-  /* If storage is full, drop ONLY this new campsite's photo. */
-  saveStateChecked(function () { camp.photo = null; });
-  clearTempCamp();
-  closeSheets();
-  renderAll();
-});
-$('campDeleteBtn').addEventListener('click', function () {
-  if (!currentCamp) return;
-  if (!confirm('Remove this campsite?')) return;
-  state.camps = state.camps.filter(function (c) { return c.id !== currentCamp.id; });
-  saveState();
-  closeSheets();
-  renderAll();
-});
-
 /* ---------------- Quest journal ---------------- */
 function questRow(park) {
   var visit = state.visits[park.id];
@@ -2016,16 +2053,6 @@ function renderJournal() {
       set.parks.map(questRow).join('') + '</div>';
   });
   $('sideListWrap').innerHTML = sh;
-  if (!state.camps.length) {
-    $('campListWrap').innerHTML = '<p class="hint">No spots yet — your first tent is waiting out there. ⛺</p>';
-  } else {
-    $('campListWrap').innerHTML = state.camps.map(function (c) {
-      return '<button type="button" class="quest-row" data-camp="' + c.id + '">' +
-        '<span class="q-ico">⛺</span><span class="q-name">' + esc(c.name) +
-        '<small>' + fmtDate(c.date) + '</small></span>' +
-        '<span class="q-badge">MINE</span></button>';
-    }).join('');
-  }
   document.querySelectorAll('[data-park]').forEach(function (row) {
     row.addEventListener('click', function () {
       var park = PARK_BY_ID[row.getAttribute('data-park')];
@@ -2039,17 +2066,6 @@ function renderJournal() {
       setTimeout(function () { openPark(park); }, 680);
     });
   });
-  document.querySelectorAll('[data-camp]').forEach(function (row) {
-    row.addEventListener('click', function () {
-      var camp = state.camps.filter(function (c) {
-        return c.id === row.getAttribute('data-camp');
-      })[0];
-      if (!camp) return;
-      closeSheets();
-      focusLatLng(camp.lat, camp.lng, FULL.w / 6);
-      setTimeout(function () { openCampView(camp); }, 680);
-    });
-  });
 }
 document.querySelectorAll('.tab').forEach(function (tab) {
   tab.addEventListener('click', function () {
@@ -2060,7 +2076,6 @@ document.querySelectorAll('.tab').forEach(function (tab) {
     var which = tab.getAttribute('data-tab');
     $('tabMain').hidden = which !== 'main';
     $('tabSide').hidden = which !== 'side';
-    $('tabSpots').hidden = which !== 'spots';
   });
 });
 
@@ -2081,7 +2096,6 @@ function renderPoster() {
     return '🧭 Side · ' + set.label + ' ' + setCleared(set) + '/' + set.parks.length;
   }).join('   ·   ');
   small += (small ? '   ·   ' : '') + '⭐ Bonus ' + bonusCleared() + '/' + PARKS_BONUS.length;
-  small += '   ·   ⛺ My Spots ' + state.camps.length;
   $('posterSmall').textContent = small;
   var names = PARKS_MAIN.filter(function (p) { return !!state.visits[p.id]; })
     .map(function (p) { return p.name; });
@@ -2163,8 +2177,7 @@ function savePosterPng() {
     small += '     ⭐ Bonus ' + bonusCleared() + '/' + PARKS_BONUS.length;
     ctx.fillStyle = '#1d3557';
     ctx.font = '800 ' + (34 * PS) + 'px ' + roundFont;
-    ctx.fillText('Explorer Lv.' + levelFor(n) + '     ' + small +
-      '     ⛺ My Spots ' + state.camps.length, cw / 2, 1252 * PS);
+    ctx.fillText('Explorer Lv.' + levelFor(n) + '     ' + small, cw / 2, 1252 * PS);
     ctx.fillStyle = '#1d3557';
     ctx.font = '400 ' + (25 * PS) + 'px ' + roundFont;
     lines.forEach(function (ln, i) { ctx.fillText(ln, cw / 2, (1310 + i * 38) * PS); });
@@ -2225,12 +2238,14 @@ $('leafToggle').addEventListener('change', function () {
 /* ---------------- Backup: export / import ----------------
    The whole quest lives in one localStorage key; this pair of
    buttons is the only way it survives a cleared browser or a
-   new phone. The file is plain JSON: visits + camps, verbatim. */
+   new phone. The file is plain JSON: visits, verbatim. Backups
+   exported before the My Spots removal also carry a camps
+   array — imports accept the file and ignore that field. */
 $('exportBtn').addEventListener('click', function () {
   var payload = {
     app: 'maplepins-quest', version: 1,
     exportedAt: new Date().toISOString(),
-    visits: state.visits, camps: state.camps
+    visits: state.visits
   };
   var blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
   var a = document.createElement('a');
@@ -2249,7 +2264,7 @@ $('importFile').addEventListener('change', function () {
     var d = null;
     try { d = JSON.parse(rd.result); } catch (e) { /* handled below */ }
     if (!d || typeof d.visits !== 'object' || d.visits === null ||
-        Array.isArray(d.visits) || !Array.isArray(d.camps)) {
+        Array.isArray(d.visits)) {
       alert('That file is not a MaplePins backup.');
       return;
     }
@@ -2257,9 +2272,8 @@ $('importFile').addEventListener('change', function () {
     Object.keys(d.visits).forEach(function (k) {
       if (!d.visits[k] || typeof d.visits[k] !== 'object') delete d.visits[k];
     });
-    if (!confirm('Replace ALL your current visits and campsites with this backup?')) return;
+    if (!confirm('Replace ALL your current visits with this backup?')) return;
     state.visits = d.visits;
-    state.camps = d.camps;
     state.samplesActive = false;
     saveState();
     closeSheets();
@@ -2270,9 +2284,8 @@ $('importFile').addEventListener('change', function () {
   rd.readAsText(f);
 });
 $('resetBtn').addEventListener('click', function () {
-  if (!confirm('Reset the whole quest? All visits, photos and campsites on this device will be cleared.')) return;
+  if (!confirm('Reset the whole quest? All visits and photos on this device will be cleared.')) return;
   state.visits = {};
-  state.camps = [];
   state.samplesActive = false;
   saveState();
   closeSheets();

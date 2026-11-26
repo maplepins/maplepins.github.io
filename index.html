@@ -110,6 +110,7 @@
       <div>
         <h2 id="pkName">Park</h2>
         <p class="park-sub"><span id="pkProv"></span> · <span id="pkKind"></span></p>
+        <p class="park-addr" id="pkAddrWrap" hidden><a id="pkAddr" target="_blank" rel="noopener">📍 <span id="pkAddrText"></span></a></p>
       </div>
     </div>
     <p class="park-blurb" id="pkBlurb"></p>
@@ -145,38 +146,6 @@
   </div>
 </section>
 
-<!-- My campsite: add form / view -->
-<section id="campSheet" class="sheet" aria-label="My campsite" hidden>
-  <div class="win-bar"><span class="win-title">MY CAMPSITE</span>
-    <button class="sheet-close win-x" type="button" data-close aria-label="Close">✕</button></div>
-  <div class="win-body">
-    <form id="campForm" hidden>
-      <label>Spot name
-        <input id="cName" type="text" required placeholder="That lakeside site near Algonquin">
-      </label>
-      <div class="form-2col">
-        <label>Date
-          <input id="cDate" type="date" required>
-        </label>
-        <label>Photo <span class="opt">(optional)</span>
-          <span class="file-btn">📷 Choose<input id="cPhoto" type="file" accept="image/*"></span>
-        </label>
-      </div>
-      <img id="cPreview" class="photo-preview" alt="Your campsite photo preview" hidden>
-      <p class="hint">Your own spot — it doesn't count toward the quests, it's just yours.</p>
-      <button class="gbtn-wide primary" type="submit">Pitch the tent ⛺</button>
-      <button class="gbtn-wide ghost" type="button" id="campCancelBtn">Cancel</button>
-    </form>
-
-    <div id="campView" hidden>
-      <h2 class="camp-name" id="cvName">Campsite</h2>
-      <img id="cvPhoto" class="park-photo" alt="Your campsite photo" hidden>
-      <p class="park-date" id="cvDate"></p>
-      <button id="campDeleteBtn" class="gbtn-wide danger" type="button">Remove this spot</button>
-    </div>
-  </div>
-</section>
-
 <!-- Quest journal with tabs -->
 <section id="journalSheet" class="sheet" aria-label="Quest journal" hidden>
   <div class="win-bar"><span class="win-title">QUEST JOURNAL</span>
@@ -185,7 +154,6 @@
     <div class="tabs" role="tablist">
       <button class="tab active" type="button" role="tab" aria-selected="true" data-tab="main">📜 Main</button>
       <button class="tab" type="button" role="tab" aria-selected="false" data-tab="side">🧭 Side</button>
-      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="spots">⛺ My Spots</button>
     </div>
 
     <div class="tab-panel" id="tabMain">
@@ -206,10 +174,6 @@
       <div id="sideListWrap"></div>
     </div>
 
-    <div class="tab-panel" id="tabSpots" hidden>
-      <p class="hint">Zoom into a province, then tap anywhere on the map to pitch your own tent — campgrounds, backcountry sites, anywhere you slept under the stars.</p>
-      <div id="campListWrap"></div>
-    </div>
   </div>
 </section>
 
@@ -253,7 +217,7 @@
     <h3 class="sheet-sub">About this quest</h3>
     <p class="hint">Main quest: the 48 places of the Parks Canada system — 37 national parks and 11 national park reserves. Bonus: Rouge, Canada's only National Urban Park, sits outside the 48 and never counts toward your level. Side quests: curated provincial parks — Ontario set included. Demo data lives only in this browser (localStorage).</p>
     <h3 class="sheet-sub">Start over</h3>
-    <p class="hint">Clears every visit, photo and campsite on this device — including the 4 sample visits — and starts the quest from zero.</p>
+    <p class="hint">Clears every visit and photo on this device — including the 4 sample visits — and starts the quest from zero.</p>
     <button id="resetBtn" class="gbtn-wide danger" type="button">Reset quest &amp; start fresh</button>
   </div>
 </section>
